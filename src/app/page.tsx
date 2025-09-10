@@ -1,103 +1,71 @@
-import Image from "next/image";
+import AdminLayout from '@/components/layout/AdminLayout';
+import MetricCard from '@/components/dashboard/MetricCard';
+import ActivityFeed from '@/components/dashboard/ActivityFeed';
+import QuickActions from '@/components/dashboard/QuickActions';
+import {
+  UsersIcon,
+  CalendarIcon,
+  ExclamationTriangleIcon,
+  ChartBarIcon,
+} from '@heroicons/react/24/outline';
 
-export default function Home() {
+export default function Dashboard() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <AdminLayout title="Dashboard">
+      <div className="space-y-6">
+        {/* Welcome Header */}
+        <div className="bg-black text-white p-4 rounded-lg">
+          <h2 className="text-xl font-medium">Welcome, Admin</h2>
+          <p className="text-gray-300 mt-1 text-sm">
+            Platform overview
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* Key Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Total Users"
+            value="2,847"
+            change={{ value: "12%", type: "increase" }}
+            icon={<UsersIcon className="h-6 w-6" />}
+            trend={[20, 35, 25, 45, 30, 55, 40]}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          <MetricCard
+            title="Active Events"
+            value="23"
+            change={{ value: "3", type: "increase" }}
+            icon={<CalendarIcon className="h-6 w-6" />}
+            trend={[15, 25, 20, 30, 25, 35, 30]}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          <MetricCard
+            title="Recent Reports"
+            value="7"
+            change={{ value: "2", type: "decrease" }}
+            icon={<ExclamationTriangleIcon className="h-6 w-6" />}
+            trend={[10, 8, 12, 6, 9, 5, 7]}
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <MetricCard
+            title="Platform Engagement"
+            value="89%"
+            change={{ value: "5%", type: "increase" }}
+            icon={<ChartBarIcon className="h-6 w-6" />}
+            trend={[70, 75, 80, 85, 82, 87, 89]}
+          />
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Activity Feed */}
+          <div>
+            <ActivityFeed />
+          </div>
+          
+          {/* Quick Actions */}
+          <div>
+            <QuickActions />
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
   );
 }
