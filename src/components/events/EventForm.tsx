@@ -155,22 +155,22 @@ export default function EventForm() {
         {activeTab === 'details' && (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Event Title</label>
+              <label className="block text-sm font-medium text-black">Event Title</label>
               <input
                 type="text"
                 {...register('title')}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 pl-2 block h-10 w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Enter event title"
               />
               {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <label className="block text-sm font-medium text-black">Description</label>
               <textarea
                 {...register('description')}
                 rows={6}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 h-10 pl-2 block w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Describe your event in detail..."
               />
               {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
@@ -178,20 +178,20 @@ export default function EventForm() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                <label className="block text-sm font-medium text-black">Start Date</label>
                 <input
                   type="date"
                   {...register('startDate')}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
                 {errors.startDate && <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                <label className="block text-sm font-medium text-black">Start Time</label>
                 <input
                   type="time"
                   {...register('startTime')}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
                 {errors.startTime && <p className="mt-1 text-sm text-red-600">{errors.startTime.message}</p>}
               </div>
@@ -199,27 +199,27 @@ export default function EventForm() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">End Date</label>
+                <label className="block text-sm font-medium text-black">End Date</label>
                 <input
                   type="date"
                   {...register('endDate')}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
                 {errors.endDate && <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">End Time</label>
+                <label className="block text-sm font-medium text-black">End Time</label>
                 <input
                   type="time"
                   {...register('endTime')}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
                 {errors.endTime && <p className="mt-1 text-sm text-red-600">{errors.endTime.message}</p>}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Venue Type</label>
+              <label className="block text-sm font-medium text-black">Venue Type</label>
               <div className="mt-2 space-x-4">
                 <label className="inline-flex items-center">
                   <input
@@ -228,7 +228,7 @@ export default function EventForm() {
                     value="physical"
                     className="form-radio h-4 w-4 text-blue-600"
                   />
-                  <span className="ml-2">Physical Location</span>
+                  <span className="ml-2 text-black">Physical Location</span>
                 </label>
                 <label className="inline-flex items-center">
                   <input
@@ -237,19 +237,19 @@ export default function EventForm() {
                     value="online"
                     className="form-radio h-4 w-4 text-blue-600"
                   />
-                  <span className="ml-2">Online Event</span>
+                  <span className="ml-2 text-black">Online Event</span>
                 </label>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium  text-black">
                 {venueType === 'online' ? 'Meeting Link' : 'Venue Address'}
               </label>
               <input
                 type="text"
                 {...register('venue')}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder={venueType === 'online' ? 'https://zoom.us/j/...' : 'Enter venue address'}
               />
               {errors.venue && <p className="mt-1 text-sm text-red-600">{errors.venue.message}</p>}
@@ -261,7 +261,7 @@ export default function EventForm() {
         {activeTab === 'media' && (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Featured Image</label>
+              <label className="block text-sm font-medium text-black">Featured Image</label>
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                 <div className="space-y-1 text-center">
                   <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -283,11 +283,11 @@ export default function EventForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Max Attendees</label>
+              <label className="block text-sm font-medium text-black">Max Attendees</label>
               <input
                 type="number"
                 {...register('maxAttendees', { valueAsNumber: true })}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 h-10 pl-2 block w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Enter maximum number of attendees"
               />
               {errors.maxAttendees && <p className="mt-1 text-sm text-red-600">{errors.maxAttendees.message}</p>}
@@ -295,7 +295,7 @@ export default function EventForm() {
 
             <div>
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">Registration Form Fields</label>
+                <label className="block text-sm font-medium text-black">Registration Form Fields</label>
                 <button
                   type="button"
                   onClick={addRegistrationField}
@@ -313,11 +313,11 @@ export default function EventForm() {
                       type="text"
                       placeholder="Field name"
                       {...register(`registrationFields.${index}.name`)}
-                      className="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="flex-1 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <select
                       {...register(`registrationFields.${index}.type`)}
-                      className="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option value="text">Text</option>
                       <option value="email">Email</option>
@@ -330,7 +330,7 @@ export default function EventForm() {
                         {...register(`registrationFields.${index}.required`)}
                         className="form-checkbox h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2 text-sm">Required</span>
+                      <span className="ml-2 text-sm text-black">Required</span>
                     </label>
                     <button
                       type="button"
@@ -351,7 +351,7 @@ export default function EventForm() {
           <div className="space-y-8">
             <div>
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">Speakers</label>
+                <label className="block text-sm font-medium text-black">Speakers</label>
                 <button
                   type="button"
                   onClick={addSpeaker}
@@ -371,19 +371,19 @@ export default function EventForm() {
                           type="text"
                           placeholder="Speaker name"
                           {...register(`speakers.${index}.name`)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          className="block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                         />
                         <textarea
                           placeholder="Speaker bio"
                           {...register(`speakers.${index}.bio`)}
                           rows={3}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          className="block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                         />
                         <input
                           type="url"
                           placeholder="Photo URL (optional)"
                           {...register(`speakers.${index}.photo`)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          className="block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                         />
                       </div>
                       <button
@@ -401,7 +401,7 @@ export default function EventForm() {
 
             <div>
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">Event Agenda</label>
+                <label className="block text-sm font-medium text-black">Event Agenda</label>
                 <button
                   type="button"
                   onClick={addAgendaItem}
@@ -418,25 +418,25 @@ export default function EventForm() {
                     <input
                       type="time"
                       {...register(`agenda.${index}.time`)}
-                      className="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Session title"
                       {...register(`agenda.${index}.title`)}
-                      className="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="flex-1 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Description"
                       {...register(`agenda.${index}.description`)}
-                      className="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="flex-1 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Speaker (optional)"
                       {...register(`agenda.${index}.speaker`)}
-                      className="w-32 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="w-32 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <button
                       type="button"
@@ -456,7 +456,7 @@ export default function EventForm() {
         {activeTab === 'publishing' && (
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Publication Status</label>
+              <label className="block text-sm font-medium text-black">Publication Status</label>
               <div className="mt-2 space-y-2">
                 <label className="inline-flex items-center">
                   <input
@@ -465,7 +465,7 @@ export default function EventForm() {
                     value="draft"
                     className="form-radio h-4 w-4 text-blue-600"
                   />
-                  <span className="ml-2">Save as Draft</span>
+                  <span className="ml-2 text-black">Save as Draft</span>
                 </label>
                 <label className="inline-flex items-center">
                   <input
@@ -474,7 +474,7 @@ export default function EventForm() {
                     value="published"
                     className="form-radio h-4 w-4 text-blue-600"
                   />
-                  <span className="ml-2">Publish Event</span>
+                  <span className="ml-2 text-black">Publish Event</span>
                 </label>
               </div>
             </div>
@@ -486,7 +486,7 @@ export default function EventForm() {
                   {...register('sendNotification')}
                   className="form-checkbox h-4 w-4 text-blue-600"
                 />
-                <span className="ml-2 text-sm font-medium text-gray-700">
+                <span className="ml-2 text-sm font-medium text-black">
                   Send notification to all users when published
                 </span>
               </label>
@@ -496,11 +496,11 @@ export default function EventForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">SEO Meta Description</label>
+              <label className="block text-sm font-medium text-black">SEO Meta Description</label>
               <textarea
                 {...register('metaDescription')}
                 rows={3}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 h-10 pl-2 block w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Brief description for search engines (optional)"
               />
               <p className="mt-1 text-sm text-gray-500">
