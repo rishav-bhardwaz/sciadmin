@@ -2,25 +2,27 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../../components/auth/AuthProvider';
 
 export default function LoginPage() {
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { login, loading } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
 
-    // Temporary bypass credentials
-    if (credentials.username === 'admin' && credentials.password === 'admin123') {
-      localStorage.setItem('adminAuth', 'true');
-      window.location.href = '/';
-    } else {
-      setError('Invalid credentials');
-      setIsLoading(false);
+    try {
+      const success = await login(credentials.email, credentials.password);
+      if (success) {
+        router.push('/');
+      } else {
+        setError('Invalid email or password. Please try again.');
+      }
+    } catch (err) {
+      setError('An error occurred during login. Please try again.');
     }
   };
 
@@ -31,21 +33,21 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-black">Sciastra Admin</h1>
           <p className="mt-2 text-gray-600">Sign in to your admin account</p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-black">Username</label>
+              <label className="block text-sm font-medium text-black">Email</label>
               <input
-                type="text"
-                value={credentials.username}
-                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                type="email"
+                value={credentials.email}
+                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black rounded-md"
-                placeholder="Enter username"
+                placeholder="Enter email"
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-black">Password</label>
               <input
@@ -60,21 +62,28 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm text-center">{error}</div>
+            <div className="text-red-600 text-sm text-center p-3 bg-red-50 rounded-md border border-red-200">
+              {error}
+            </div>
           )}
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={loading}
             className="w-full flex justify-center py-2 px-4 border border-black bg-black text-white font-medium hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-black disabled:opacity-50 rounded-md"
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            {loading ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Signing in...
+              </div>
+            ) : (
+              'Sign In'
+            )}
           </button>
-          
+
           <div className="text-center text-sm text-gray-500">
-            <p>Demo credentials:</p>
-            <p>Username: <span className="font-mono">admin</span></p>
-            <p>Password: <span className="font-mono">admin123</span></p>
+            <p>Enter your admin credentials to access the dashboard</p>
           </div>
         </form>
       </div>

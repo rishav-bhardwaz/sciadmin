@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -10,7 +10,8 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
-import BlacklistModal from "./BlacklistModal"
+import BlacklistModal from "./BlacklistModal";
+import { usersApi, ApiError } from '../../lib/api';
 
 interface User {
   id: string;
@@ -113,14 +114,70 @@ export default function UsersTable() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showBlacklistModal, setShowBlacklistModal] = useState(false);
-
-  const filteredUsers = mockUsers.filter(user => {
-    const matchesSearch = user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesStatus && matchesRole;
+  const [page, setPage] = useState(1);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 0
   });
+  const limit = 50;
+
+  // Reset to page 1 when filters change
+  const resetPage = () => setPage(1);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // For now, use mock data since the API endpoint has issues
+      // When the backend is fixed, replace this with the actual API call:
+      // const response = await usersApi.getUsers({
+      //   status: statusFilter !== 'all' ? statusFilter : undefined,
+      //   search: searchTerm || undefined,
+      //   page,
+      //   limit
+      // });
+
+      // Mock API response format for now
+      const filteredUsers = mockUsers.filter(user => {
+        const matchesSearch = searchTerm === '' ||
+          user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+        const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+        return matchesSearch && matchesStatus && matchesRole;
+      });
+
+      const start = (page - 1) * limit;
+      const paginatedUsers = filteredUsers.slice(start, start + limit);
+
+      setUsers(paginatedUsers);
+      setPagination({
+        page,
+        limit,
+        total: filteredUsers.length,
+        pages: Math.ceil(filteredUsers.length / limit)
+      });
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError(err instanceof ApiError ? err.message : 'Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchUsers();
+    }, searchTerm ? 500 : 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [page, statusFilter, roleFilter, searchTerm]);
 
   const handleBlacklistAction = (user: User) => {
     setSelectedUser(user);
@@ -151,7 +208,7 @@ export default function UsersTable() {
                   type="text"
                   placeholder="Search users by name or email..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
               </div>
@@ -160,7 +217,7 @@ export default function UsersTable() {
               <div className="w-40">
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }}
                   className="block w-full px-3 py-2 border border-gray-300 text-black rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
                   <option value="all">All Status</option>
@@ -171,7 +228,7 @@ export default function UsersTable() {
               <div className="w-40">
                 <select
                   value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
+                  onChange={(e) => { setRoleFilter(e.target.value); resetPage(); }}
                   className="block w-full px-3 py-2 border border-gray-300 text-black rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
                   <option value="all">All Roles</option>
@@ -213,7 +270,26 @@ export default function UsersTable() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                    Loading users...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-red-500">
+                    Error: {error}
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                    No users found
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -293,18 +369,16 @@ export default function UsersTable() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {filteredUsers.length === 0 && (
+        {!loading && users.length === 0 && (searchTerm || statusFilter !== 'all' || roleFilter !== 'all') && (
           <div className="text-center py-12">
             <div className="text-gray-500">
-              {searchTerm || statusFilter !== 'all' || roleFilter !== 'all'
-                ? 'No users match your search criteria.'
-                : 'No users found.'
-              }
+              No users match your search criteria.
             </div>
           </div>
         )}
@@ -322,9 +396,26 @@ export default function UsersTable() {
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredUsers.length}</span> of{' '}
-                <span className="font-medium">{mockUsers.length}</span> results
+                Showing <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
+                <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
+                <span className="font-medium">{pagination.total}</span> results
               </p>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= pagination.pages}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           </div>
         </div>

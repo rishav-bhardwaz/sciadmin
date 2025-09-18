@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -10,70 +10,34 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
+import { eventsApi, ApiError } from '../../lib/api';
 
 interface Event {
   id: string;
   title: string;
+  description?: string;
   startDate: Date;
   endDate: Date;
-  status: 'draft' | 'published' | 'concluded';
-  registrations: number;
+  status: 'draft' | 'published' | 'concluded' | 'cancelled';
+  registrations?: number;
   maxAttendees?: number;
   featuredImage?: string;
-  venue: string;
+  venue?: string;
+  category?: string;
+  price?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: {
+    registrations?: number;
+  };
 }
-
-const mockEvents: Event[] = [
-  {
-    id: '1',
-    title: 'Quantum Mechanics Workshop',
-    startDate: new Date('2024-02-15T10:00:00'),
-    endDate: new Date('2024-02-15T16:00:00'),
-    status: 'published',
-    registrations: 45,
-    maxAttendees: 50,
-    featuredImage: '/api/placeholder/80/60',
-    venue: 'Physics Lab A',
-  },
-  {
-    id: '2',
-    title: 'AI Ethics Seminar',
-    startDate: new Date('2024-02-20T14:00:00'),
-    endDate: new Date('2024-02-20T17:00:00'),
-    status: 'published',
-    registrations: 120,
-    maxAttendees: 100,
-    featuredImage: '/api/placeholder/80/60',
-    venue: 'Online',
-  },
-  {
-    id: '3',
-    title: 'Data Science Bootcamp',
-    startDate: new Date('2024-03-01T09:00:00'),
-    endDate: new Date('2024-03-03T18:00:00'),
-    status: 'draft',
-    registrations: 0,
-    maxAttendees: 30,
-    venue: 'Computer Lab B',
-  },
-  {
-    id: '4',
-    title: 'Robotics Competition',
-    startDate: new Date('2024-01-10T10:00:00'),
-    endDate: new Date('2024-01-10T18:00:00'),
-    status: 'concluded',
-    registrations: 80,
-    maxAttendees: 80,
-    featuredImage: '/api/placeholder/80/60',
-    venue: 'Engineering Hall',
-  },
-];
 
 const getStatusBadge = (status: Event['status']) => {
   const styles = {
     draft: 'bg-gray-100 text-gray-800',
     published: 'bg-green-100 text-green-800',
     concluded: 'bg-blue-100 text-blue-800',
+    cancelled: 'bg-red-100 text-red-800',
   };
 
   return (
@@ -86,18 +50,71 @@ const getStatusBadge = (status: Event['status']) => {
 export default function EventsTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  const filteredEvents = mockEvents.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.venue.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || event.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 0
   });
 
-  const handleDelete = (eventId: string) => {
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await eventsApi.getEvents({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
+        page,
+        limit: 50
+      });
+
+      if (response.success && response.data) {
+        const transformedEvents = response.data.events.map((event: any) => ({
+          ...event,
+          startDate: new Date(event.startDate),
+          endDate: new Date(event.endDate),
+          registrations: event._count?.registrations || 0,
+        }));
+        setEvents(transformedEvents);
+        setPagination(response.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
+      }
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      setError(err instanceof ApiError ? err.message : 'Failed to fetch events');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchEvents();
+    }, searchTerm ? 500 : 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, statusFilter, categoryFilter, page]);
+
+  const filteredEvents = events.filter(event => {
+    if (!searchTerm) return true;
+    return event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           (event.venue && event.venue.toLowerCase().includes(searchTerm.toLowerCase())) ||
+           (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
+
+  const handleDelete = async (eventId: string) => {
     if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-      // Handle delete logic here
-      console.log('Deleting event:', eventId);
+      try {
+        await eventsApi.deleteEvent(eventId);
+        await fetchEvents();
+      } catch (err) {
+        console.error('Error deleting event:', err);
+        setError(err instanceof ApiError ? err.message : 'Failed to delete event');
+      }
     }
   };
 
@@ -130,12 +147,40 @@ export default function EventsTable() {
               <option value="draft">Draft</option>
               <option value="published">Published</option>
               <option value="concluded">Concluded</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div className="sm:w-48">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md text-black shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              <option value="all">All Categories</option>
+              <option value="workshop">Workshop</option>
+              <option value="seminar">Seminar</option>
+              <option value="competition">Competition</option>
+              <option value="conference">Conference</option>
             </select>
           </div>
         </div>
       </div>
 
+      {/* Loading/Error States */}
+      {loading && (
+        <div className="text-center py-12">
+          <div className="text-gray-500">Loading events...</div>
+        </div>
+      )}
+
+      {error && (
+        <div className="text-center py-12">
+          <div className="text-red-500">{error}</div>
+        </div>
+      )}
+
       {/* Table */}
+      {!loading && !error && (
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -195,10 +240,10 @@ export default function EventsTable() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {event.registrations}
+                    {event.registrations || 0}
                     {event.maxAttendees && ` / ${event.maxAttendees}`}
                   </div>
-                  {event.maxAttendees && (
+                  {event.maxAttendees && event.registrations !== undefined && (
                     <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                       <div
                         className="bg-blue-600 h-2 rounded-full"
@@ -210,7 +255,7 @@ export default function EventsTable() {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {event.venue}
+                  {event.venue || 'TBA'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">
@@ -242,14 +287,62 @@ export default function EventsTable() {
           </tbody>
         </table>
       </div>
+      )}
 
-      {filteredEvents.length === 0 && (
+      {!loading && !error && filteredEvents.length === 0 && (
         <div className="text-center py-12">
           <div className="text-gray-500">
-            {searchTerm || statusFilter !== 'all' 
-              ? 'No events match your search criteria.' 
+            {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
+              ? 'No events match your search criteria.'
               : 'No events found. Create your first event to get started.'
             }
+          </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && !error && pagination.total > 0 && (
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page <= 1}
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page >= pagination.pages}
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
+                <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
+                <span className="font-medium">{pagination.total}</span> results
+              </p>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= pagination.pages}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}
