@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 import {
   DocumentTextIcon,
   PhotoIcon,
@@ -11,531 +14,1012 @@ import {
   CogIcon,
   PlusIcon,
   TrashIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
-import clsx from 'clsx';
+import { eventsApi } from '@/lib/api';
 
-const eventSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().min(1, 'Description is required'),
-  startDate: z.string().min(1, 'Start date is required'),
-  startTime: z.string().min(1, 'Start time is required'),
-  endDate: z.string().min(1, 'End date is required'),
-  endTime: z.string().min(1, 'End time is required'),
-  venue: z.string().min(1, 'Venue is required'),
-  venueType: z.enum(['online', 'physical']),
-  venueLink: z.string().optional(),
-  maxAttendees: z.number().min(1, 'Max attendees must be at least 1'),
-  registrationFields: z.array(z.object({
-    name: z.string(),
-    type: z.enum(['text', 'email', 'phone', 'select']),
-    required: z.boolean(),
-    options: z.array(z.string()).optional(),
-  })),
-  speakers: z.array(z.object({
-    name: z.string(),
-    bio: z.string(),
-    photo: z.string().optional(),
-  })),
-  agenda: z.array(z.object({
-    time: z.string(),
-    title: z.string(),
-    description: z.string(),
-    speaker: z.string().optional(),
-  })),
-  status: z.enum(['draft', 'published']),
-  sendNotification: z.boolean(),
-  metaDescription: z.string().optional(),
+// Types based on backend API
+type RegistrationFieldType = 'TEXT' | 'EMAIL' | 'PHONE' | 'SELECT' | 'CHECKBOX' | 'RADIO';
+type VenueType = 'ONLINE' | 'PHYSICAL' | 'HYBRID';
+type SessionType = 'KEYNOTE' | 'PANEL' | 'WORKSHOP' | 'BREAK' | 'NETWORKING';
+type EventCategory = 'FEATURED' | 'WORKSHOP' | 'WEBINAR' | 'CONFERENCE' | 'MEETUP';
+
+interface RegistrationField {
+  fieldName: string;
+  fieldType: RegistrationFieldType;
+  isRequired: boolean;
+  placeholder?: string;
+  options?: string[];
+  order: number;
+}
+
+interface Speaker {
+  name: string;
+  title: string;
+  company?: string;
+  bio?: string;
+  profileImage?: string;
+  socialLinks?: {
+    linkedin?: string;
+    twitter?: string;
+    website?: string;
+  };
+}
+
+interface AgendaItem {
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  speakerName?: string;
+  sessionType: SessionType;
+}
+
+// Form Schemas based on backend API
+const registrationFieldSchema = z.object({
+  fieldName: z.string().min(1, 'Field name is required'),
+  fieldType: z.enum(['TEXT', 'EMAIL', 'PHONE', 'SELECT', 'CHECKBOX', 'RADIO']),
+  isRequired: z.boolean().default(false),
+  placeholder: z.string().optional(),
+  options: z.array(z.string()).optional(),
+  order: z.number(),
 });
 
-type EventFormData = z.infer<typeof eventSchema>;
+const speakerSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  title: z.string().min(1, 'Title is required'),
+  company: z.string().optional(),
+  bio: z.string().optional(),
+  profileImage: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+  socialLinks: z.object({
+    linkedin: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+    twitter: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+    website: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+  }).optional(),
+});
+
+const agendaItemSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+  startTime: z.string().min(1, 'Start time is required'),
+  endTime: z.string().min(1, 'End time is required'),
+  speakerName: z.string().optional(),
+  sessionType: z.enum(['KEYNOTE', 'PANEL', 'WORKSHOP', 'BREAK', 'NETWORKING']),
+});
+
+// Step Schemas matching backend API exactly
+const step1Schema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().min(1, 'Description is required'),
+  startDateTime: z.string().min(1, 'Start date is required'),
+  endDateTime: z.string().min(1, 'End date is required'),
+  venueType: z.enum(['ONLINE', 'PHYSICAL', 'HYBRID']),
+  location: z.string().optional(),
+  venueAddress: z.string().optional(),
+});
+
+const step2Schema = z.object({
+  featuredImage: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+  maxAttendees: z.number().min(1, 'Must have at least 1 attendee'),
+  price: z.number().min(0, 'Price cannot be negative').optional(),
+  isFree: z.boolean(),
+  registrationFields: z.array(registrationFieldSchema),
+});
+
+const step3Schema = z.object({
+  speakers: z.array(speakerSchema),
+  agenda: z.array(agendaItemSchema),
+});
+
+type Step1Data = z.infer<typeof step1Schema>;
+type Step2Data = z.infer<typeof step2Schema>;
+type Step3Data = z.infer<typeof step3Schema>;
 
 const tabs = [
-  { id: 'details', name: 'Core Details', icon: DocumentTextIcon },
-  { id: 'media', name: 'Media & Registration', icon: PhotoIcon },
+  { id: 'details', name: 'Basic Details', icon: DocumentTextIcon },
+  { id: 'configuration', name: 'Configuration', icon: CogIcon },
   { id: 'speakers', name: 'Speakers & Agenda', icon: UserGroupIcon },
-  { id: 'publishing', name: 'Publishing Controls', icon: CogIcon },
+  { id: 'publish', name: 'Review & Publish', icon: CheckCircleIcon },
 ];
 
 export default function EventForm() {
-  const [activeTab, setActiveTab] = useState('details');
-  const [featuredImage, setFeaturedImage] = useState<File | null>(null);
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<EventFormData>({
-    resolver: zodResolver(eventSchema),
+  // Step 1 Form
+  const step1Form = useForm<Step1Data>({
+    resolver: zodResolver(step1Schema),
     defaultValues: {
-      venueType: 'physical',
-      status: 'draft',
-      sendNotification: false,
+      title: '',
+      description: '',
+      venueType: 'ONLINE',
+      location: '',
+      venueAddress: '',
+    },
+  });
+
+  // Step 2 Form
+  const step2Form = useForm<Step2Data>({
+    resolver: zodResolver(step2Schema),
+    defaultValues: {
+      featuredImage: '',
+      maxAttendees: 100,
+      price: 0,
+      isFree: true,
       registrationFields: [
-        { name: 'Full Name', type: 'text', required: true },
-        { name: 'Email', type: 'email', required: true },
+        { fieldName: 'Full Name', fieldType: 'TEXT', isRequired: true, placeholder: 'Enter your full name', order: 1 },
+        { fieldName: 'Email', fieldType: 'EMAIL', isRequired: true, placeholder: 'Enter your email address', order: 2 },
       ],
+    },
+  });
+
+  // Step 3 Form
+  const step3Form = useForm<Step3Data>({
+    resolver: zodResolver(step3Schema),
+    defaultValues: {
       speakers: [],
       agenda: [],
     },
   });
 
-  const venueType = watch('venueType');
-  const registrationFields = watch('registrationFields') || [];
-  const speakers = watch('speakers') || [];
-  const agenda = watch('agenda') || [];
+  // Field arrays for step 2
+  const {
+    fields: registrationFields,
+    append: appendRegistrationField,
+    remove: removeRegistrationField,
+  } = useFieldArray({
+    control: step2Form.control,
+    name: 'registrationFields',
+  });
 
-  const onSubmit = (data: EventFormData) => {
-    console.log('Event data:', data);
-    // Handle form submission
+  // Field arrays for step 3
+  const {
+    fields: speakerFields,
+    append: appendSpeaker,
+    remove: removeSpeaker,
+  } = useFieldArray({
+    control: step3Form.control,
+    name: 'speakers',
+  });
+
+  const {
+    fields: agendaFields,
+    append: appendAgendaItem,
+    remove: removeAgendaItem,
+  } = useFieldArray({
+    control: step3Form.control,
+    name: 'agenda',
+  });
+
+  // Watch values
+  const venueType = step1Form.watch('venueType');
+  const isFree = step2Form.watch('isFree');
+
+  const goToStep = (step: number) => {
+    if (step >= 1 && step <= 4) {
+      setCurrentStep(step);
+    }
   };
 
+  const isStepComplete = (step: number) => completedSteps.includes(step);
+
+  // Submit handlers
+  const onSubmitStep1 = async (data: Step1Data) => {
+    try {
+      setIsSubmitting(true);
+      const result = await eventsApi.createEventStep1(data);
+
+      // Check if we have a direct event object or wrapped response
+      if (result.success || result.id) {
+        const newEventId = result.id || result.data?.id || result.data?.eventId || result.eventId;
+        setEventId(newEventId);
+        setCompletedSteps([...completedSteps, 1]);
+        toast.success('Basic details saved successfully!');
+        goToStep(2);
+      } else {
+        throw new Error(result?.message || 'Failed to save basic details');
+      }
+    } catch (error: any) {
+      console.error('Error saving step 1:', error);
+      toast.error(error.message || 'Failed to save basic details');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onSubmitStep2 = async (data: Step2Data) => {
+    if (!eventId) {
+      toast.error('Please complete step 1 first');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const result = await eventsApi.updateEventStep2(eventId, data);
+
+      if (result.success || result.id || result.updatedAt) {
+        setCompletedSteps([...completedSteps, 2]);
+        toast.success('Configuration saved successfully!');
+        goToStep(3);
+      } else {
+        throw new Error(result?.message || 'Failed to save configuration');
+      }
+    } catch (error: any) {
+      console.error('Error saving step 2:', error);
+      toast.error(error.message || 'Failed to save configuration');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onSubmitStep3 = async (data: Step3Data) => {
+    if (!eventId) {
+      toast.error('Please complete previous steps first');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const result = await eventsApi.updateEventStep3(eventId, data);
+
+      if (result.success || result.id || result.updatedAt) {
+        setCompletedSteps([...completedSteps, 3]);
+        toast.success('Speakers and agenda saved successfully!');
+        goToStep(4);
+      } else {
+        throw new Error(result?.message || 'Failed to save speakers and agenda');
+      }
+    } catch (error: any) {
+      console.error('Error saving step 3:', error);
+      toast.error(error.message || 'Failed to save speakers and agenda');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onPublishEvent = async () => {
+    if (!eventId) {
+      toast.error('Cannot publish event');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // Send the data format your backend expects
+      const finalizeResult = await eventsApi.finalizeEvent(eventId, {
+        status: 'PUBLISHED',
+        sendNotification: true
+      });
+      
+      if (finalizeResult.success || finalizeResult.id || finalizeResult.updatedAt) {
+        setCompletedSteps([...completedSteps, 4]);
+        toast.success('Event published successfully!');
+        router.push('/events');
+      } else {
+        throw new Error(finalizeResult?.message || 'Failed to publish event');
+      }
+    } catch (error: any) {
+      console.error('Error publishing event:', error);
+      toast.error(error.message || 'Failed to publish event');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Helper functions
   const addRegistrationField = () => {
-    const newField = { name: '', type: 'text' as const, required: false };
-    setValue('registrationFields', [...registrationFields, newField]);
-  };
-
-  const removeRegistrationField = (index: number) => {
-    const updated = registrationFields.filter((_, i) => i !== index);
-    setValue('registrationFields', updated);
+    appendRegistrationField({
+      fieldName: '',
+      fieldType: 'TEXT',
+      isRequired: false,
+      placeholder: '',
+      order: registrationFields.length + 1,
+    });
   };
 
   const addSpeaker = () => {
-    const newSpeaker = { name: '', bio: '', photo: '' };
-    setValue('speakers', [...speakers, newSpeaker]);
-  };
-
-  const removeSpeaker = (index: number) => {
-    const updated = speakers.filter((_, i) => i !== index);
-    setValue('speakers', updated);
+    appendSpeaker({
+      name: '',
+      title: '',
+      company: '',
+      bio: '',
+      profileImage: '',
+      socialLinks: {
+        linkedin: '',
+        twitter: '',
+        website: '',
+      },
+    });
   };
 
   const addAgendaItem = () => {
-    const newItem = { time: '', title: '', description: '', speaker: '' };
-    setValue('agenda', [...agenda, newItem]);
+    appendAgendaItem({
+      title: '',
+      description: '',
+      startTime: '',
+      endTime: '',
+      speakerName: '',
+      sessionType: 'WORKSHOP',
+    });
   };
 
-  const removeAgendaItem = (index: number) => {
-    const updated = agenda.filter((_, i) => i !== index);
-    setValue('agenda', updated);
+  const renderStep1 = () => (
+    <form onSubmit={step1Form.handleSubmit(onSubmitStep1)} className="space-y-6 p-6">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Basic Event Details</h2>
+        <p className="mt-1 text-sm text-gray-500">Provide the basic information about your event.</p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+            Event Title <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="title"
+            {...step1Form.register('title')}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            placeholder="e.g., Tech Conference 2024"
+          />
+          {step1Form.formState.errors.title && (
+            <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.title.message}</p>
+          )}
+        </div>
+
+
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            Description <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            id="description"
+            rows={4}
+            {...step1Form.register('description')}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            placeholder="Describe your event in detail..."
+          />
+          {step1Form.formState.errors.description && (
+            <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.description.message}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="startDateTime" className="block text-sm font-medium text-gray-700">
+              Start Date & Time <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              id="startDateTime"
+              {...step1Form.register('startDateTime')}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+            {step1Form.formState.errors.startDateTime && (
+              <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.startDateTime.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="endDateTime" className="block text-sm font-medium text-gray-700">
+              End Date & Time <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              id="endDateTime"
+              {...step1Form.register('endDateTime')}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+            {step1Form.formState.errors.endDateTime && (
+              <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.endDateTime.message}</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Venue Type <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {[
+              { value: 'ONLINE', label: 'Online', icon: '🌐' },
+              { value: 'PHYSICAL', label: 'In-Person', icon: '🏢' },
+              { value: 'HYBRID', label: 'Hybrid', icon: '🔀' },
+            ].map((option) => (
+              <label
+                key={option.value}
+                className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none ${
+                  venueType === option.value
+                    ? 'border-indigo-500 ring-2 ring-indigo-500'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="sr-only"
+                  value={option.value}
+                  {...step1Form.register('venueType')}
+                />
+                <div className="flex flex-col items-center w-full">
+                  <span className="text-2xl mb-2">{option.icon}</span>
+                  <span className="block text-sm font-medium text-gray-900">{option.label}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {venueType !== 'ONLINE' && (
+          <>
+            <div>
+              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+                Location
+              </label>
+              <input
+                type="text"
+                id="location"
+                {...step1Form.register('location')}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder="Convention Center"
+              />
+            </div>
+            <div>
+              <label htmlFor="venueAddress" className="block text-sm font-medium text-gray-700">
+                Venue Address
+              </label>
+              <input
+                type="text"
+                id="venueAddress"
+                {...step1Form.register('venueAddress')}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder="123 Main St, City, Country"
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Saving...' : 'Save & Continue'}
+        </button>
+      </div>
+    </form>
+  );
+
+  const renderStep2 = () => (
+    <form onSubmit={step2Form.handleSubmit(onSubmitStep2)} className="space-y-6 p-6">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Event Configuration</h2>
+        <p className="mt-1 text-sm text-gray-500">Configure pricing, capacity, and registration options.</p>
+      </div>
+
+      <div className="space-y-6">
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900">Featured Image</h3>
+          <div className="mt-4">
+            <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700">
+              Image URL
+            </label>
+            <input
+              type="url"
+              id="featuredImage"
+              {...step2Form.register('featuredImage')}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              placeholder="https://example.com/event-banner.jpg"
+            />
+            {step2Form.formState.errors.featuredImage && (
+              <p className="mt-1 text-sm text-red-600">{step2Form.formState.errors.featuredImage.message}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900">Pricing</h3>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center">
+              <input
+                id="isFree"
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                {...step2Form.register('isFree')}
+              />
+              <label htmlFor="isFree" className="ml-2 block text-sm text-gray-700">
+                This is a free event
+              </label>
+            </div>
+
+            {!isFree && (
+              <div>
+                <label htmlFor="price" className="block text-sm font-medium text-gray-700">
+                  Price (in INR)
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 sm:text-sm">₹</span>
+                  </div>
+                  <input
+                    type="number"
+                    id="price"
+                    step="0.01"
+                    min="0"
+                    {...step2Form.register('price', { valueAsNumber: true })}
+                    className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                    placeholder="0.00"
+                  />
+                </div>
+                {step2Form.formState.errors.price && (
+                  <p className="mt-1 text-sm text-red-600">{step2Form.formState.errors.price.message}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-lg font-medium text-gray-900">Capacity</h3>
+          <div className="mt-4">
+            <label htmlFor="maxAttendees" className="block text-sm font-medium text-gray-700">
+              Maximum number of attendees
+            </label>
+            <input
+              type="number"
+              id="maxAttendees"
+              min="1"
+              {...step2Form.register('maxAttendees', { valueAsNumber: true })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              placeholder="100"
+            />
+            {step2Form.formState.errors.maxAttendees && (
+              <p className="mt-1 text-sm text-red-600">{step2Form.formState.errors.maxAttendees.message}</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900">Registration Form</h3>
+            <button
+              type="button"
+              onClick={addRegistrationField}
+              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
+              Add Field
+            </button>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">Customize the registration form fields for attendees.</p>
+
+          <div className="mt-4 space-y-4">
+            {registrationFields.map((field, index) => (
+              <div key={field.id} className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg">
+                <div className="flex-1 space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Field Name</label>
+                      <input
+                        type="text"
+                        {...step2Form.register(`registrationFields.${index}.fieldName` as const)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="e.g., Phone Number"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Field Type</label>
+                      <select
+                        {...step2Form.register(`registrationFields.${index}.fieldType` as const)}
+                        className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <option value="TEXT">Text</option>
+                        <option value="EMAIL">Email</option>
+                        <option value="PHONE">Phone</option>
+                        <option value="SELECT">Dropdown</option>
+                        <option value="CHECKBOX">Checkbox</option>
+                        <option value="RADIO">Radio Buttons</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Placeholder</label>
+                    <input
+                      type="text"
+                      {...step2Form.register(`registrationFields.${index}.placeholder` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Enter placeholder text"
+                    />
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      id={`required-${index}`}
+                      type="checkbox"
+                      {...step2Form.register(`registrationFields.${index}.isRequired` as const)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor={`required-${index}`} className="ml-2 block text-sm text-gray-700">
+                      Required field
+                    </label>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeRegistrationField(index)}
+                  className="flex-shrink-0 p-2 text-red-600 hover:text-red-800"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between pt-4">
+        <button
+          type="button"
+          onClick={() => goToStep(1)}
+          className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Back
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Saving...' : 'Save & Continue'}
+        </button>
+      </div>
+    </form>
+  );
+
+  const renderStep3 = () => (
+    <form onSubmit={step3Form.handleSubmit(onSubmitStep3)} className="space-y-6 p-6">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Speakers & Agenda</h2>
+        <p className="mt-1 text-sm text-gray-500">Add speakers and create your event agenda.</p>
+      </div>
+
+      <div className="space-y-6">
+        <div className="border-b border-gray-200 pb-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900">Speakers</h3>
+            <button
+              type="button"
+              onClick={addSpeaker}
+              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
+              Add Speaker
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {speakerFields.map((field, index) => (
+              <div key={field.id} className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex justify-between items-start mb-4">
+                  <h4 className="text-md font-medium text-gray-900">Speaker {index + 1}</h4>
+                  <button
+                    type="button"
+                    onClick={() => removeSpeaker(index)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Name *</label>
+                    <input
+                      type="text"
+                      {...step3Form.register(`speakers.${index}.name` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Dr. Jane Smith"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Title *</label>
+                    <input
+                      type="text"
+                      {...step3Form.register(`speakers.${index}.title` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="AI Research Director"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Company</label>
+                    <input
+                      type="text"
+                      {...step3Form.register(`speakers.${index}.company` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="TechCorp"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Profile Image URL</label>
+                    <input
+                      type="url"
+                      {...step3Form.register(`speakers.${index}.profileImage` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="https://example.com/speaker.jpg"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700">Bio</label>
+                  <textarea
+                    rows={3}
+                    {...step3Form.register(`speakers.${index}.bio` as const)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    placeholder="Leading AI researcher with 15+ years of experience"
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Social Links</label>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                      <input
+                        type="url"
+                        {...step3Form.register(`speakers.${index}.socialLinks.linkedin` as const)}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="LinkedIn URL"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="url"
+                        {...step3Form.register(`speakers.${index}.socialLinks.twitter` as const)}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="Twitter URL"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="url"
+                        {...step3Form.register(`speakers.${index}.socialLinks.website` as const)}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="Website URL"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900">Agenda</h3>
+            <button
+              type="button"
+              onClick={addAgendaItem}
+              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
+              Add Agenda Item
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {agendaFields.map((field, index) => (
+              <div key={field.id} className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex justify-between items-start mb-4">
+                  <h4 className="text-md font-medium text-gray-900">Agenda Item {index + 1}</h4>
+                  <button
+                    type="button"
+                    onClick={() => removeAgendaItem(index)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Title *</label>
+                    <input
+                      type="text"
+                      {...step3Form.register(`agenda.${index}.title` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Opening Keynote: The Future of AI"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Start Time *</label>
+                    <input
+                      type="datetime-local"
+                      {...step3Form.register(`agenda.${index}.startTime` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">End Time *</label>
+                    <input
+                      type="datetime-local"
+                      {...step3Form.register(`agenda.${index}.endTime` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Speaker Name</label>
+                    <input
+                      type="text"
+                      {...step3Form.register(`agenda.${index}.speakerName` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Dr. Jane Smith"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Session Type</label>
+                    <select
+                      {...step3Form.register(`agenda.${index}.sessionType` as const)}
+                      className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="KEYNOTE">Keynote</option>
+                      <option value="PANEL">Panel</option>
+                      <option value="WORKSHOP">Workshop</option>
+                      <option value="BREAK">Break</option>
+                      <option value="NETWORKING">Networking</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <textarea
+                    rows={3}
+                    {...step3Form.register(`agenda.${index}.description` as const)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    placeholder="Exploring the latest trends and future directions in artificial intelligence"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between pt-4">
+        <button
+          type="button"
+          onClick={() => goToStep(2)}
+          className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Back
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Saving...' : 'Save & Continue'}
+        </button>
+      </div>
+    </form>
+  );
+
+  const renderStep4 = () => (
+    <div className="space-y-6 p-6">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Review & Publish</h2>
+        <p className="mt-1 text-sm text-gray-500">Review your event details and publish when ready.</p>
+      </div>
+
+      <div className="bg-green-50 border border-green-200 rounded-md p-4">
+        <div className="flex">
+          <CheckCircleIcon className="h-5 w-5 text-green-400" />
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-green-800">Event Ready to Publish</h3>
+            <div className="mt-2 text-sm text-green-700">
+              <p>Your event has been configured successfully. Click the button below to make it live and available for registration.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between pt-4">
+        <button
+          type="button"
+          onClick={() => goToStep(3)}
+          className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onPublishEvent}
+          disabled={isSubmitting}
+          className="inline-flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Publishing...' : 'Publish Event'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return renderStep1();
+      case 2:
+        return renderStep2();
+      case 3:
+        return renderStep3();
+      case 4:
+        return renderStep4();
+      default:
+        return renderStep1();
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-sm rounded-lg border border-gray-200">
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8 px-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              <tab.icon
-                className={clsx(
-                  'mr-2 h-5 w-5',
-                  activeTab === tab.id ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
-                )}
-              />
-              {tab.name}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      <div className="p-6">
-        {/* Core Details Tab */}
-        {activeTab === 'details' && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-black">Event Title</label>
-              <input
-                type="text"
-                {...register('title')}
-                className="mt-1 pl-2 block h-10 w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Enter event title"
-              />
-              {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black">Description</label>
-              <textarea
-                {...register('description')}
-                rows={6}
-                className="mt-1 h-10 pl-2 block w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Describe your event in detail..."
-              />
-              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-black">Start Date</label>
-                <input
-                  type="date"
-                  {...register('startDate')}
-                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-                {errors.startDate && <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black">Start Time</label>
-                <input
-                  type="time"
-                  {...register('startTime')}
-                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-                {errors.startTime && <p className="mt-1 text-sm text-red-600">{errors.startTime.message}</p>}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-black">End Date</label>
-                <input
-                  type="date"
-                  {...register('endDate')}
-                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-                {errors.endDate && <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black">End Time</label>
-                <input
-                  type="time"
-                  {...register('endTime')}
-                  className="mt-1 block w-full h-10 pl-2 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-                {errors.endTime && <p className="mt-1 text-sm text-red-600">{errors.endTime.message}</p>}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black">Venue Type</label>
-              <div className="mt-2 space-x-4">
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    {...register('venueType')}
-                    value="physical"
-                    className="form-radio h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2 text-black">Physical Location</span>
-                </label>
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    {...register('venueType')}
-                    value="online"
-                    className="form-radio h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2 text-black">Online Event</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium  text-black">
-                {venueType === 'online' ? 'Meeting Link' : 'Venue Address'}
-              </label>
-              <input
-                type="text"
-                {...register('venue')}
-                className="mt-1 block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder={venueType === 'online' ? 'https://zoom.us/j/...' : 'Enter venue address'}
-              />
-              {errors.venue && <p className="mt-1 text-sm text-red-600">{errors.venue.message}</p>}
-            </div>
-          </div>
-        )}
-
-        {/* Media & Registration Tab */}
-        {activeTab === 'media' && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-black">Featured Image</label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                      <span>Upload a file</span>
-                      <input
-                        type="file"
-                        className="sr-only"
-                        accept="image/*"
-                        onChange={(e) => setFeaturedImage(e.target.files?.[0] || null)}
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black">Max Attendees</label>
-              <input
-                type="number"
-                {...register('maxAttendees', { valueAsNumber: true })}
-                className="mt-1 h-10 pl-2 block w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Enter maximum number of attendees"
-              />
-              {errors.maxAttendees && <p className="mt-1 text-sm text-red-600">{errors.maxAttendees.message}</p>}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-black">Registration Form Fields</label>
-                <button
-                  type="button"
-                  onClick={addRegistrationField}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add Field
-                </button>
-              </div>
-              
-              <div className="mt-3 space-y-3">
-                {registrationFields.map((field, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
-                    <input
-                      type="text"
-                      placeholder="Field name"
-                      {...register(`registrationFields.${index}.name`)}
-                      className="flex-1 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                    <select
-                      {...register(`registrationFields.${index}.type`)}
-                      className="h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto py-8">
+        {/* Progress Steps */}
+        <div className="mb-8">
+          <nav aria-label="Progress">
+            <ol className="flex items-center">
+              {tabs.map((tab, index) => (
+                <li key={tab.id} className={`relative ${index !== tabs.length - 1 ? 'pr-8 sm:pr-20' : ''}`}>
+                  <div className="flex items-center">
+                    <div
+                      className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
+                        currentStep > index + 1 || isStepComplete(index + 1)
+                          ? 'bg-indigo-600'
+                          : currentStep === index + 1
+                          ? 'border-2 border-indigo-600 bg-white'
+                          : 'border-2 border-gray-300 bg-white'
+                      }`}
                     >
-                      <option value="text">Text</option>
-                      <option value="email">Email</option>
-                      <option value="phone">Phone</option>
-                      <option value="select">Select</option>
-                    </select>
-                    <label className="inline-flex items-center">
-                      <input
-                        type="checkbox"
-                        {...register(`registrationFields.${index}.required`)}
-                        className="form-checkbox h-4 w-4 text-blue-600"
-                      />
-                      <span className="ml-2 text-sm text-black">Required</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => removeRegistrationField(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Speakers & Agenda Tab */}
-        {activeTab === 'speakers' && (
-          <div className="space-y-8">
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-black">Speakers</label>
-                <button
-                  type="button"
-                  onClick={addSpeaker}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add Speaker
-                </button>
-              </div>
-              
-              <div className="mt-3 space-y-4">
-                {speakers.map((speaker, index) => (
-                  <div key={index} className="p-4 border border-gray-200 rounded-md">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 space-y-3">
-                        <input
-                          type="text"
-                          placeholder="Speaker name"
-                          {...register(`speakers.${index}.name`)}
-                          className="block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        />
-                        <textarea
-                          placeholder="Speaker bio"
-                          {...register(`speakers.${index}.bio`)}
-                          rows={3}
-                          className="block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        />
-                        <input
-                          type="url"
-                          placeholder="Photo URL (optional)"
-                          {...register(`speakers.${index}.photo`)}
-                          className="block w-full h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeSpeaker(index)}
-                        className="ml-3 text-red-600 hover:text-red-800"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {currentStep > index + 1 || isStepComplete(index + 1) ? (
+                        <CheckCircleIcon className="h-5 w-5 text-white" />
+                      ) : (
+                        <span
+                          className={`text-sm font-medium ${
+                            currentStep === index + 1 ? 'text-indigo-600' : 'text-gray-500'
+                          }`}
+                        >
+                          {index + 1}
+                        </span>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-black">Event Agenda</label>
-                <button
-                  type="button"
-                  onClick={addAgendaItem}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
-                >
-                  <PlusIcon className="h-4 w-4 mr-1" />
-                  Add Agenda Item
-                </button>
-              </div>
-              
-              <div className="mt-3 space-y-3">
-                {agenda.map((item, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-md">
-                    <input
-                      type="time"
-                      {...register(`agenda.${index}.time`)}
-                      className="h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Session title"
-                      {...register(`agenda.${index}.title`)}
-                      className="flex-1 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      {...register(`agenda.${index}.description`)}
-                      className="flex-1 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Speaker (optional)"
-                      {...register(`agenda.${index}.speaker`)}
-                      className="w-32 h-10 pl-2 border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeAgendaItem(index)}
-                      className="text-red-600 hover:text-red-800"
+                    <span
+                      className={`ml-4 text-sm font-medium ${
+                        currentStep === index + 1 ? 'text-indigo-600' : 'text-gray-500'
+                      }`}
                     >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                      {tab.name}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+                  {index !== tabs.length - 1 && (
+                    <div
+                      className={`absolute top-4 left-4 -ml-px mt-0.5 h-full w-0.5 ${
+                        currentStep > index + 1 || isStepComplete(index + 1) ? 'bg-indigo-600' : 'bg-gray-300'
+                      }`}
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </div>
 
-        {/* Publishing Controls Tab */}
-        {activeTab === 'publishing' && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-black">Publication Status</label>
-              <div className="mt-2 space-y-2">
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    {...register('status')}
-                    value="draft"
-                    className="form-radio h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2 text-black">Save as Draft</span>
-                </label>
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    {...register('status')}
-                    value="published"
-                    className="form-radio h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2 text-black">Publish Event</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="inline-flex items-center">
-                <input
-                  type="checkbox"
-                  {...register('sendNotification')}
-                  className="form-checkbox h-4 w-4 text-blue-600"
-                />
-                <span className="ml-2 text-sm font-medium text-black">
-                  Send notification to all users when published
-                </span>
-              </label>
-              <p className="mt-1 text-sm text-gray-500">
-                This will send an email notification to all registered users about the new event.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black">SEO Meta Description</label>
-              <textarea
-                {...register('metaDescription')}
-                rows={3}
-                className="mt-1 h-10 pl-2 block w-full border-gray-300 text-black rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Brief description for search engines (optional)"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Recommended length: 150-160 characters
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Form Actions */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-        <button
-          type="button"
-          className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          Cancel
-        </button>
-        <div className="flex space-x-3">
-          <button
-            type="submit"
-            onClick={() => setValue('status', 'draft')}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Save as Draft
-          </button>
-          <button
-            type="submit"
-            onClick={() => setValue('status', 'published')}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Publish Event
-          </button>
+        {/* Form Content */}
+        <div className="bg-white shadow rounded-lg">
+          {renderCurrentStep()}
         </div>
       </div>
-    </form>
+    </div>
   );
 }

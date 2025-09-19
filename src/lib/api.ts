@@ -1,6 +1,9 @@
 // API Configuration and utilities for sciadmin frontend
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/admin/admin';
+// Different services may have different routing through the gateway
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'http://localhost:8080/admin/admin';
+const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'http://localhost:8080/admin/admin';
+const API_BASE_URL = AUTH_API_BASE_URL; // Default for backward compatibility
 
 // API response interface
 interface ApiResponse<T = any> {
@@ -13,6 +16,8 @@ interface ApiResponse<T = any> {
     total: number;
     pages: number;
   };
+  // Allow direct access to response properties
+  [key: string]: any;
 }
 
 // Error handling
@@ -50,6 +55,16 @@ const apiClient = async <T>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   const token = getAuthToken();
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  console.log(`API Request: ${options.method || 'GET'} ${url}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    body: options.body ? JSON.parse(options.body as string) : undefined,
+  });
 
   const config: RequestInit = {
     headers: {
@@ -61,14 +76,32 @@ const apiClient = async <T>(
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, errorData.message || 'API Error', errorData);
+    const response = await fetch(url, config);
+    const responseText = await response.text();
+    let data;
+    
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      console.error('Failed to parse JSON response:', responseText);
+      throw new ApiError(response.status, 'Invalid JSON response', { responseText });
     }
 
-    const data = await response.json();
+    console.log(`API Response (${response.status}):`, {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      data,
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status, 
+        data.message || 'API Error', 
+        data
+      );
+    }
+
     return data;
   } catch (error) {
     if (error instanceof ApiError) {
@@ -79,19 +112,39 @@ const apiClient = async <T>(
 };
 
 // Authentication API
+interface LoginResponse {
+  accessToken: string;
+  admin: any;
+  success?: boolean;
+  message?: string;
+}
+
+type LoginApiResponse = LoginResponse | ApiResponse<LoginResponse>;
+
 export const authApi = {
-  login: async (email: string, password: string): Promise<ApiResponse<{ token: string; admin: any }>> => {
-    const response = await apiClient<{ token: string; admin: any }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+  login: async (email: string, password: string): Promise<LoginResponse> => {
+    console.log('Auth API - Login attempt:', { email });
+    try {
+      const response = await apiClient<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }) as LoginResponse; // Cast the response to LoginResponse
 
-    if (response.success && response.data?.token) {
-      setAuthToken(response.data.token);
-      localStorage.setItem('adminAuth', 'true');
+      console.log('Auth API - Login response:', response);
+
+      if (response.accessToken) {
+        console.log('Auth API - Setting auth token and admin state');
+        setAuthToken(response.accessToken);
+        localStorage.setItem('adminAuth', 'true');
+        return response;
+      } else {
+        console.warn('Auth API - Login failed - no access token in response');
+        throw new Error('Login failed: No access token in response');
+      }
+    } catch (error) {
+      console.error('Auth API - Login error:', error);
+      throw error;
     }
-
-    return response;
   },
 
   logout: async (): Promise<void> => {
@@ -169,6 +222,68 @@ export const usersApi = {
   },
 };
 
+// Events API client with custom base URL
+const eventsApiClient = async <T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> => {
+  const token = getAuthToken();
+  const url = `${EVENTS_API_BASE_URL}${endpoint}`;
+
+  console.log(`Events API Request: ${options.method || 'GET'} ${url}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    body: options.body ? JSON.parse(options.body as string) : undefined,
+  });
+
+  const config: RequestInit = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  try {
+    const response = await fetch(url, config);
+    const responseText = await response.text();
+    let data;
+    
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      console.error('Failed to parse JSON response:', responseText);
+      throw new ApiError(response.status, 'Invalid JSON response', { responseText });
+    }
+
+    console.log(`Events API Response (${response.status}):`, {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      data,
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status, 
+        data.message || 'API Error', 
+        data
+      );
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Network Error');
+  }
+};
+
 // Events API
 export const eventsApi = {
   getEvents: async (params?: {
@@ -183,7 +298,7 @@ export const eventsApi = {
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
 
-    return apiClient(`/events?${searchParams.toString()}`);
+    return apiClient(`/events/all?${searchParams.toString()}`);
   },
 
   getEventById: async (eventId: string): Promise<ApiResponse<any>> => {
@@ -191,37 +306,48 @@ export const eventsApi = {
   },
 
   createEventStep1: async (data: any): Promise<ApiResponse<any>> => {
-    return apiClient('/events/step1', {
+    return eventsApiClient('/events/step1', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   updateEventStep2: async (eventId: string, data: any): Promise<ApiResponse<any>> => {
-    return apiClient(`/events/${eventId}/step2`, {
+    return eventsApiClient(`/events/${eventId}/step2`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
 
   updateEventStep3: async (eventId: string, data: any): Promise<ApiResponse<any>> => {
-    return apiClient(`/events/${eventId}/step3`, {
+    return eventsApiClient(`/events/${eventId}/step3`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
 
   finalizeEvent: async (eventId: string, data: any): Promise<ApiResponse<any>> => {
-    return apiClient(`/events/${eventId}/finalize`, {
+    const config: any = {
       method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    };
+    
+    // Only add body if data is provided and not null
+    if (data && data !== null) {
+      config.body = JSON.stringify(data);
+    }
+    
+    return eventsApiClient(`/events/${eventId}/finalize`, config);
   },
 
   updateEventStatus: async (eventId: string, status: string, category?: string): Promise<ApiResponse<any>> => {
     return apiClient(`/events/${eventId}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status, category }),
+      body: JSON.stringify({ 
+        status, 
+        category,
+        sendNotification: true,
+        reason: 'Event published and ready for registration'
+      }),
     });
   },
 

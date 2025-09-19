@@ -33,28 +33,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const authStatus = localStorage.getItem('adminAuth');
       const token = localStorage.getItem('adminToken');
+      const storedUser = localStorage.getItem('adminUser');
 
       if (authStatus === 'true' && token) {
-        // Verify token is still valid by fetching user profile
-        const response = await authApi.getProfile();
-        if (response.success && response.data) {
-          setUser(response.data);
-          setIsAuthenticated(true);
-        } else {
-          // Token is invalid, clear auth state
-          localStorage.removeItem('adminAuth');
-          localStorage.removeItem('adminToken');
-          setIsAuthenticated(false);
-          setUser(null);
+        // First, set auth state from localStorage to avoid login redirect
+        setIsAuthenticated(true);
+        
+        // If we have stored user data, use it immediately
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (e) {
+            console.error('Error parsing stored user data:', e);
+          }
+        }
+
+        // Then verify token in background (don't clear auth on failure)
+        try {
+          const response = await authApi.getProfile();
+          if (response.success && response.data) {
+            setUser(response.data);
+            // Update stored user data
+            localStorage.setItem('adminUser', JSON.stringify(response.data));
+          }
+        } catch (profileError) {
+          console.warn('Profile fetch failed, but keeping user logged in:', profileError);
+          // Don't clear auth state - token might still be valid for other operations
         }
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
-      // Clear auth state on error
-      localStorage.removeItem('adminAuth');
-      localStorage.removeItem('adminToken');
-      setIsAuthenticated(false);
-      setUser(null);
+      // Only clear auth state if there's no token at all
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        localStorage.removeItem('adminAuth');
+        localStorage.removeItem('adminUser');
+        setIsAuthenticated(false);
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -73,13 +89,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
+      console.log('Attempting login with:', { email });
       const response = await authApi.login(email, password);
+      console.log('Login response:', response);
 
-      if (response.success && response.data) {
-        setUser(response.data.admin);
+      if (response?.admin && response?.accessToken) {
+        console.log('Login successful, setting user and auth state');
+        setUser(response.admin);
         setIsAuthenticated(true);
+        
+        // Store user data for persistence
+        localStorage.setItem('adminUser', JSON.stringify(response.admin));
+        
         return true;
       }
+
+      console.log('Login failed - invalid response format:', response);
       return false;
     } catch (error) {
       console.error('Login error:', error);
@@ -97,6 +122,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error);
       // Continue with logout even if API call fails
     } finally {
+      // Clear all stored auth data
+      localStorage.removeItem('adminAuth');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      
       setUser(null);
       setIsAuthenticated(false);
       setLoading(false);

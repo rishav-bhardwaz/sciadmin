@@ -73,15 +73,26 @@ export default function EventsTable() {
         limit: 50
       });
 
-      if (response.success && response.data) {
-        const transformedEvents = response.data.events.map((event: any) => ({
+      // Handle both wrapped and direct response formats
+      const eventsData = response.success ? response.data?.events : response.events;
+
+      if (eventsData && Array.isArray(eventsData)) {
+        const transformedEvents = eventsData.map((event: any) => ({
           ...event,
-          startDate: new Date(event.startDate),
-          endDate: new Date(event.endDate),
-          registrations: event._count?.registrations || 0,
+          startDate: new Date(event.startDateTime || event.startDate),
+          endDate: new Date(event.endDateTime || event.endDate),
+          registrations: event.registrationCount || event._count?.registrations || 0,
         }));
         setEvents(transformedEvents);
-        setPagination(response.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
+
+        // Handle pagination
+        const paginationData = response.success ? response.data?.pagination : response.pagination;
+        setPagination(paginationData || {
+          page: 1,
+          limit: 50,
+          total: eventsData.length,
+          pages: Math.ceil(eventsData.length / 50)
+        });
       }
     } catch (err) {
       console.error('Error fetching events:', err);
@@ -102,8 +113,8 @@ export default function EventsTable() {
   const filteredEvents = events.filter(event => {
     if (!searchTerm) return true;
     return event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           (event.venue && event.venue.toLowerCase().includes(searchTerm.toLowerCase())) ||
-           (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      (event.venue && event.venue.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
   });
 
   const handleDelete = async (eventId: string) => {
@@ -181,112 +192,112 @@ export default function EventsTable() {
 
       {/* Table */}
       {!loading && !error && (
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Event
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date & Time
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Registrations
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Venue
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredEvents.map((event) => (
-              <tr key={event.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    {event.featuredImage && (
-                      <div className="flex-shrink-0 h-12 w-16 mr-4">
-                        <div className="h-12 w-16 rounded-md bg-gray-200 flex items-center justify-center">
-                          <span className="text-xs text-gray-500">IMG</span>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Event
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date & Time
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Registrations
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Venue
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredEvents.map((event) => (
+                <tr key={event.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      {event.featuredImage && (
+                        <div className="flex-shrink-0 h-12 w-16 mr-4">
+                          <div className="h-12 w-16 rounded-md bg-gray-200 flex items-center justify-center">
+                            <span className="text-xs text-gray-500">IMG</span>
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {event.title}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          ID: {event.id}
                         </div>
                       </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {event.startDate.toLocaleDateString()}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {event.startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(event.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {event.registrations || 0}
+                      {event.maxAttendees && ` / ${event.maxAttendees}`}
+                    </div>
+                    {event.maxAttendees && event.registrations !== undefined && (
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{
+                            width: `${Math.min((event.registrations / event.maxAttendees) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
                     )}
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {event.title}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        ID: {event.id}
-                      </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {event.venue || 'TBA'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end space-x-2">
+                      <Link
+                        href={`/events/${event.id}`}
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded-md hover:bg-blue-50"
+                        title="View Event"
+                      >
+                        <EyeIcon className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href={`/events/${event.id}/edit`}
+                        className="text-green-600 hover:text-green-900 p-1 rounded-md hover:bg-green-50"
+                        title="Edit Event"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50"
+                        title="Delete Event"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {event.startDate.toLocaleDateString()}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {event.startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(event.status)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {event.registrations || 0}
-                    {event.maxAttendees && ` / ${event.maxAttendees}`}
-                  </div>
-                  {event.maxAttendees && event.registrations !== undefined && (
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{
-                          width: `${Math.min((event.registrations / event.maxAttendees) * 100, 100)}%`
-                        }}
-                      ></div>
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {event.venue || 'TBA'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end space-x-2">
-                    <Link
-                      href={`/events/${event.id}`}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded-md hover:bg-blue-50"
-                      title="View Event"
-                    >
-                      <EyeIcon className="h-4 w-4" />
-                    </Link>
-                    <Link
-                      href={`/events/${event.id}/edit`}
-                      className="text-green-600 hover:text-green-900 p-1 rounded-md hover:bg-green-50"
-                      title="Edit Event"
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(event.id)}
-                      className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50"
-                      title="Delete Event"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {!loading && !error && filteredEvents.length === 0 && (
