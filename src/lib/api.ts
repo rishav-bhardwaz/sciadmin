@@ -115,7 +115,8 @@ const apiClient = async <T>(
 
 // Authentication API
 interface LoginResponse {
-  accessToken: string;
+  accessToken?: string;
+  token?: string; // Allow 'token' for API variants
   admin: any;
   success?: boolean;
   message?: string;
@@ -130,15 +131,27 @@ export const authApi = {
       const response = await apiClient<LoginResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      }) as LoginResponse; // Cast the response to LoginResponse
+      });
 
       console.log('Auth API - Login response:', response);
 
-      if (response.accessToken) {
-        console.log('Auth API - Setting auth token and admin state');
-        setAuthToken(response.accessToken);
+      // Fix: extract token from new backend response format
+      // It can be response.token, response.data?.token, or response.accessToken
+      // Normalize response structure:
+      let admin;
+      let token;
+      if (response.data) {
+        admin = response.data.admin;
+        token = response.data.token || response.data.accessToken;
+      } else {
+        admin = response.admin;
+        token = response.token || response.accessToken;
+      }
+
+      if (admin && token) {
+        setAuthToken(token);
         localStorage.setItem('adminAuth', 'true');
-        return response;
+        return { admin, accessToken: token, success: true };
       } else {
         console.warn('Auth API - Login failed - no access token in response');
         throw new Error('Login failed: No access token in response');
