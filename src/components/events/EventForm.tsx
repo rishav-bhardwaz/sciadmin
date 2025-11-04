@@ -765,7 +765,7 @@ export default function EventForm() {
                       <label className="block text-sm font-medium text-gray-700">{item.label}</label>
                       <input
                         type="text"
-                        {...step3Form.register(item.field as const)}
+                        {...step3Form.register(item.field as `speakers.${number}.name` | `speakers.${number}.title` | `speakers.${number}.company` | `speakers.${number}.profileImage`)}
                         className="mt-1 block w-full rounded-md border border-black shadow-sm sm:text-sm placeholder:text-gray-400 text-black focus:border-black focus:ring-black px-3 py-2"
                         placeholder={item.placeholder}
                       />
@@ -794,7 +794,7 @@ export default function EventForm() {
                       <input
                         key={item.field}
                         type="url"
-                        {...step3Form.register(item.field as const)}
+                        {...step3Form.register(item.field as `speakers.${number}.name` | `speakers.${number}.title` | `speakers.${number}.company` | `speakers.${number}.profileImage` | `speakers.${number}.socialLinks.linkedin` | `speakers.${number}.socialLinks.twitter` | `speakers.${number}.socialLinks.website`)}
                         className="block w-full rounded-md border border-black shadow-sm sm:text-sm placeholder:text-gray-400 text-black focus:border-black focus:ring-black px-3 py-2"
                         placeholder={item.placeholder}
                       />
