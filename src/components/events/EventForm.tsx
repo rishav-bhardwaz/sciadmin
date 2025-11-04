@@ -927,12 +927,12 @@ export default function EventForm() {
           <h2 className="text-xl font-bold text-gray-900">Review & Publish</h2>
           <p className="mt-1 text-sm text-gray-500">Review your event details and publish when ready.</p>
         </div>
-        <button
+        {/* <button
           type="button"
           className="inline-flex justify-center rounded-md border border-transparent bg-blue-900 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
         >
           publish
-        </button>
+        </button> */}
       </div>
 
       <div className="bg-green-50 border border-green-200 rounded-md p-4">

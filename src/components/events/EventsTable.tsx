@@ -246,7 +246,7 @@ export default function EventsTable() {
                       {event.startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-black">
                     {getStatusBadge(event.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
