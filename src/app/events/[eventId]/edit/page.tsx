@@ -692,8 +692,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
       <div>
         <h2 className="text-xl font-bold text-gray-900">Basic Event Details</h2>
         <p className="mt-1 text-sm text-gray-500">Provide the basic information about your event.</p>
-      </div>
-
+      </div> 
       <div className="space-y-4">
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700">
@@ -757,6 +756,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
               <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.endDateTime.message}</p>
             )}
           </div>
+
         </div>
 
         <div>

@@ -7,6 +7,8 @@
 // const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'http://localhost:8080/admin/admin';
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://xcience.in/admin/admin';
 const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'https://xcience.in/admin/admin';
+// const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://bitter-things-tap.loca.lt/admin/admin';
+// const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'https://bitter-things-tap.loca.lt/admin/admin';
 const API_BASE_URL = AUTH_API_BASE_URL; // Default for backward compatibility
 
 // API response interface

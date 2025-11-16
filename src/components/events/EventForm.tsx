@@ -91,6 +91,7 @@ const agendaItemSchema = z.object({
 const step1Schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
+  meetLink: z.string(),
   startDateTime: z.string().min(1, 'Start date is required'),
   endDateTime: z.string().min(1, 'End date is required'),
   venueType: z.enum(['ONLINE', 'PHYSICAL', 'HYBRID']),
@@ -99,6 +100,7 @@ const step1Schema = z.object({
 });
 
 const step2Schema = z.object({
+  category: z.string(),
   featuredImage: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   maxAttendees: z.number().min(1, 'Must have at least 1 attendee'),
   price: z.number().min(0, 'Price cannot be negative').optional(),
@@ -135,6 +137,7 @@ export default function EventForm() {
     defaultValues: {
       title: '',
       description: '',
+      meetLink: "",
       venueType: 'ONLINE',
       location: '',
       venueAddress: '',
@@ -145,6 +148,7 @@ export default function EventForm() {
   const step2Form = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
     defaultValues: {
+      category:"",
       featuredImage: '',
       maxAttendees: 100,
       price: 0,
@@ -389,6 +393,20 @@ export default function EventForm() {
           )}
         </div>
 
+        {/* Meet Link */}
+        <div className="mt-4">
+          <label htmlFor="meetLink" className="block text-sm font-medium text-gray-700">
+            Meet Link
+          </label>
+          <input
+            type="url"
+            id="meetLink"
+            {...step1Form.register('meetLink')}
+            className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
+            placeholder="https://example.com/event-banner.jpg"
+          />
+        </div>
+
         {/* Date & Time */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -436,8 +454,8 @@ export default function EventForm() {
               <label
                 key={option.value}
                 className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm transition ${venueType === option.value
-                    ? "border-gray-600 ring-2 ring-gray-500"
-                    : "border-gray-300 hover:border-gray-400"
+                  ? "border-gray-600 ring-2 ring-gray-500"
+                  : "border-gray-300 hover:border-gray-400"
                   }`}
               >
                 <input
@@ -508,6 +526,31 @@ export default function EventForm() {
           Configure pricing, capacity, and registration options.
         </p>
       </div>
+
+        {/* Category */}
+  <div className="border-b border-gray-200 pb-6">
+    <h3 className="text-lg font-medium text-gray-900">Category</h3>
+    <div className="mt-4">
+      <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+        Select Category
+      </label>
+      <select
+        id="category"
+        {...step2Form.register("category")}
+        className="mt-1 block w-full rounded-md border border-gray-400 text-black shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
+      >
+        <option value="">Select Category</option>
+        <option value="FEATURED">FEATURED</option>
+        <option value="OTHERS">OTHERS</option>
+      </select>
+      {step2Form.formState.errors.category && (
+        <p className="mt-1 text-sm text-red-600">
+          {step2Form.formState.errors.category.message}
+        </p>
+      )}
+    </div>
+  </div>
+
 
       <div className="space-y-6">
         {/* Featured Image */}
@@ -994,10 +1037,10 @@ export default function EventForm() {
                   <div className="flex items-center">
                     <div
                       className={`relative flex h-8 w-8 items-center justify-center rounded-full ${currentStep > index + 1 || isStepComplete(index + 1)
-                          ? 'bg-indigo-600'
-                          : currentStep === index + 1
-                            ? 'border-2 border-indigo-600 bg-white'
-                            : 'border-2 border-gray-300 bg-white'
+                        ? 'bg-indigo-600'
+                        : currentStep === index + 1
+                          ? 'border-2 border-indigo-600 bg-white'
+                          : 'border-2 border-gray-300 bg-white'
                         }`}
                     >
                       {currentStep > index + 1 || isStepComplete(index + 1) ? (
