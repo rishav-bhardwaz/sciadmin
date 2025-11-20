@@ -34,14 +34,14 @@ interface Event {
 
 const getStatusBadge = (status: Event['status']) => {
   const styles = {
-    draft: 'bg-gray-100 text-gray-800',
-    published: 'bg-green-100 text-green-800',
-    concluded: 'bg-blue-100 text-blue-800',
-    cancelled: 'bg-red-100 text-red-800',
+    DRAFT: 'bg-gray-100 text-gray-800',
+    PUBLISHED: 'bg-green-100 text-green-800',
+    CONCLUDED: 'bg-blue-100 text-blue-800',
+    CANCELLED: 'bg-red-100 text-red-800',
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status.toUpperCase()]}`}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
@@ -246,7 +246,7 @@ export default function EventsTable() {
                       {event.startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap text-black">
                     {getStatusBadge(event.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
