@@ -1,14 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../components/auth/AuthProvider';
 
 export default function LoginPage() {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const { login, loading } = useAuth();
+  const { login, loading, isAuthenticated } = useAuth();
   const router = useRouter();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

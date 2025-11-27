@@ -25,61 +25,6 @@ interface User {
   eventsAttended: number;
 }
 
-const mockUsers: User[] = [
-  {
-    id: '1',
-    profilePicture: '/api/placeholder/40/40',
-    fullName: 'John Doe',
-    email: 'john.doe@example.com',
-    joinDate: new Date('2023-01-15'),
-    status: 'active',
-    role: 'student',
-    postsCount: 23,
-    eventsAttended: 5,
-  },
-  {
-    id: '2',
-    profilePicture: '/api/placeholder/40/40',
-    fullName: 'Alice Smith',
-    email: 'alice.smith@example.com',
-    joinDate: new Date('2023-03-22'),
-    status: 'active',
-    role: 'mentor',
-    postsCount: 45,
-    eventsAttended: 12,
-  },
-  {
-    id: '3',
-    fullName: 'Bob Johnson',
-    email: 'bob.johnson@example.com',
-    joinDate: new Date('2023-02-10'),
-    status: 'blacklisted',
-    role: 'student',
-    postsCount: 8,
-    eventsAttended: 2,
-  },
-  {
-    id: '4',
-    profilePicture: '/api/placeholder/40/40',
-    fullName: 'Sarah Wilson',
-    email: 'sarah.wilson@example.com',
-    joinDate: new Date('2023-04-05'),
-    status: 'active',
-    role: 'admin',
-    postsCount: 67,
-    eventsAttended: 18,
-  },
-  {
-    id: '5',
-    fullName: 'Mike Brown',
-    email: 'mike.brown@example.com',
-    joinDate: new Date('2023-05-12'),
-    status: 'active',
-    role: 'student',
-    postsCount: 12,
-    eventsAttended: 3,
-  },
-];
 
 const getStatusBadge = (status: User['status']) => {
   const styles = {
@@ -134,38 +79,41 @@ export default function UsersTable() {
       setLoading(true);
       setError(null);
 
-      // For now, use mock data since the API endpoint has issues
-      // When the backend is fixed, replace this with the actual API call:
-      // const response = await usersApi.getUsers({
-      //   status: statusFilter !== 'all' ? statusFilter : undefined,
-      //   search: searchTerm || undefined,
-      //   page,
-      //   limit
-      // });
-
-      // Mock API response format for now
-      const filteredUsers = mockUsers.filter(user => {
-        const matchesSearch = searchTerm === '' ||
-          user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-        const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-        return matchesSearch && matchesStatus && matchesRole;
-      });
-
-      const start = (page - 1) * limit;
-      const paginatedUsers = filteredUsers.slice(start, start + limit);
-
-      setUsers(paginatedUsers);
-      setPagination({
+      const response = await usersApi.getUsers({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: searchTerm || undefined,
         page,
-        limit,
-        total: filteredUsers.length,
-        pages: Math.ceil(filteredUsers.length / limit)
+        limit
       });
+
+      if (response.success && response.data) {
+        const usersData = response.data.users || response.data || [];
+        const mappedUsers: User[] = usersData.map((user: any) => ({
+          id: user.id || user._id,
+          profilePicture: user.profilePicture || user.profileImage,
+          fullName: user.fullName || user.name || user.profileName || 'Unknown',
+          email: user.email || '',
+          joinDate: user.joinDate ? new Date(user.joinDate) : new Date(),
+          status: user.status === 'BLACKLISTED' || user.status === 'blacklisted' ? 'blacklisted' : 'active',
+          role: user.role || 'student',
+          postsCount: user.postsCount || 0,
+          eventsAttended: user.eventsAttended || 0,
+        }));
+
+        setUsers(mappedUsers);
+        setPagination(response.data.pagination || {
+          page,
+          limit,
+          total: mappedUsers.length,
+          pages: Math.ceil(mappedUsers.length / limit)
+        });
+      } else {
+        throw new Error(response.message || 'Failed to fetch users');
+      }
     } catch (err) {
       console.error('Error fetching users:', err);
       setError(err instanceof ApiError ? err.message : 'Failed to fetch users');
+      setUsers([]);
     } finally {
       setLoading(false);
     }

@@ -11,10 +11,10 @@ import clsx from 'clsx';
 import ContentTable from './ContentTable';
 
 const tabs = [
-  { id: 'all', name: 'All Content', icon: Squares2X2Icon, count: 1247 },
-  { id: 'posts', name: 'Posts', icon: DocumentTextIcon, count: 892 },
-  { id: 'comments', name: 'Comments', icon: ChatBubbleLeftIcon, count: 355 },
-  { id: 'reported', name: 'Reported Items', icon: ExclamationTriangleIcon, count: 12 },
+  { id: 'all', name: 'All Content', icon: Squares2X2Icon },
+  { id: 'posts', name: 'Posts', icon: DocumentTextIcon },
+  { id: 'comments', name: 'Comments', icon: ChatBubbleLeftIcon },
+  { id: 'reported', name: 'Reported Items', icon: ExclamationTriangleIcon },
 ];
 
 export default function ContentModerationTabs() {
@@ -43,16 +43,6 @@ export default function ContentModerationTabs() {
                 )}
               />
               {tab.name}
-              <span
-                className={clsx(
-                  'ml-2 py-0.5 px-2.5 rounded-full text-xs font-medium',
-                  activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'bg-gray-100 text-gray-900'
-                )}
-              >
-                {tab.count}
-              </span>
             </button>
           ))}
         </nav>

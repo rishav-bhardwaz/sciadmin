@@ -1,4 +1,7 @@
+'use client';
+
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'react-hot-toast';
 import {
   UserIcon,
   CalendarIcon,
@@ -83,6 +86,21 @@ const getActivityColor = (type: Activity['type']) => {
 };
 
 export default function ActivityFeed() {
+  const handleActivityClick = () => {
+    toast('This is dummy data and should not be considered real', {
+      icon: '⚠️',
+      duration: 4000,
+    });
+  };
+
+  const handleViewAllClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    toast('This is dummy data and should not be considered real', {
+      icon: '⚠️',
+      duration: 4000,
+    });
+  };
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="px-4 py-3 border-b border-gray-200">
@@ -91,7 +109,11 @@ export default function ActivityFeed() {
       
       <div className="divide-y divide-gray-200">
         {mockActivities.slice(0, 5).map((activity) => (
-          <div key={activity.id} className="px-4 py-3">
+          <div 
+            key={activity.id} 
+            className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={handleActivityClick}
+          >
             <div className="flex items-start space-x-2">
               <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md ${getActivityColor(activity.type)}`}>
                 {getActivityIcon(activity.type)}
@@ -113,7 +135,10 @@ export default function ActivityFeed() {
       </div>
       
       <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
-        <button className="text-xs text-black hover:underline">
+        <button 
+          className="text-xs text-black hover:underline"
+          onClick={handleViewAllClick}
+        >
           View all →
         </button>
       </div>

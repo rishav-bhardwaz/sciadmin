@@ -21,6 +21,13 @@ export default function Dashboard() {
           </p>
         </div>
 
+        {/* Status Note */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            <span className="font-medium">Note:</span> Event and content management is working as of 29 November 2025
+          </p>
+        </div>
+
         {/* Key Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard

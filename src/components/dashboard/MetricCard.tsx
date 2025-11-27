@@ -1,5 +1,8 @@
+'use client';
+
 import { ReactNode } from 'react';
 import clsx from 'clsx';
+import { toast } from 'react-hot-toast';
 
 interface MetricCardProps {
   title: string;
@@ -13,8 +16,18 @@ interface MetricCardProps {
 }
 
 export default function MetricCard({ title, value, change, icon, trend }: MetricCardProps) {
+  const handleClick = () => {
+    toast('This is dummy data and should not be considered real', {
+      icon: '⚠️',
+      duration: 4000,
+    });
+  };
+
   return (
-    <div className="bg-white border border-gray-200 p-4 rounded-lg">
+    <div 
+      className="bg-white border border-gray-200 p-4 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+      onClick={handleClick}
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-xs text-gray-600">{title}</p>

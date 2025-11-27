@@ -189,6 +189,7 @@ export const authApi = {
 };
 
 // Users API
+// Note: Using same base URL as other APIs, but users endpoint might need different path
 export const usersApi = {
   getUsers: async (params?: {
     status?: string;
@@ -202,42 +203,44 @@ export const usersApi = {
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
 
-    return apiClient(`/users?${searchParams.toString()}`);
+    // Try /admin/users first - if this doesn't work, the endpoint might not exist
+    // or the base URL structure might be different for users
+    return apiClient(`/admin/users?${searchParams.toString()}`);
   },
 
   getUserById: async (userId: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/users/${userId}`);
+    return apiClient(`/admin/users/${userId}`);
   },
 
   updateUserStatus: async (userId: string, status: string, reason?: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/users/${userId}/status`, {
+    return apiClient(`/admin/users/${userId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status, reason }),
     });
   },
 
   blacklistUser: async (userId: string, reason?: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/users/${userId}/blacklist`, {
+    return apiClient(`/admin/users/${userId}/blacklist`, {
       method: 'PUT',
       body: JSON.stringify({ reason }),
     });
   },
 
   unblacklistUser: async (userId: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/users/${userId}/unblacklist`, {
+    return apiClient(`/admin/users/${userId}/unblacklist`, {
       method: 'PUT',
     });
   },
 
   deleteUser: async (userId: string, reason?: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/users/${userId}`, {
+    return apiClient(`/admin/users/${userId}`, {
       method: 'DELETE',
       body: JSON.stringify({ reason }),
     });
   },
 
   getUserStats: async (): Promise<ApiResponse<any>> => {
-    return apiClient('/users/stats');
+    return apiClient('/admin/users/stats');
   },
 };
 
@@ -362,10 +365,8 @@ export const eventsApi = {
     return apiClient(`/events/${eventId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ 
-        status, 
-        category,
-        sendNotification: true,
-        reason: 'Event published and ready for registration'
+        status,
+        ...(category && { category })
       }),
     });
   },
@@ -464,17 +465,57 @@ export const contentApi = {
     });
   },
 
-  getContentReports: async (params?: {
-    status?: string;
-    type?: 'post' | 'comment';
-    page?: number;
-    limit?: number;
+  // Reporting API - Updated to match new API documentation
+  // Note: Base URL already includes /admin/admin, so endpoints should start with /content
+  getReports: async (params?: {
+    status?: 'PENDING' | 'UNDER_REVIEW' | 'VALIDATED' | 'DISMISSED';
+    type?: 'post' | 'profile';
   }): Promise<ApiResponse<{ reports: any[]; pagination: any }>> => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.append('status', params.status);
     if (params?.type) searchParams.append('type', params.type);
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    // Remove pagination - fetch all data
+    searchParams.append('limit', '1000');
+
+    return apiClient(`/content/reports?${searchParams.toString()}`);
+  },
+
+  getReportDetails: async (reportId: string): Promise<ApiResponse<any>> => {
+    return apiClient(`/content/reports/${reportId}`);
+  },
+
+  takeActionOnReport: async (
+    reportId: string,
+    action: 'validate' | 'resolve' | 'dismiss' | 'escalate' | 'review',
+    notes?: string
+  ): Promise<ApiResponse<any>> => {
+    return apiClient(`/content/reports/${reportId}/action`, {
+      method: 'PUT',
+      body: JSON.stringify({ action, notes }),
+    });
+  },
+
+  getFlaggedContent: async (params?: {
+    type?: 'post' | 'profile';
+  }): Promise<ApiResponse<{ content: any[]; pagination: any }>> => {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.append('type', params.type);
+    // Remove pagination - fetch all data
+    searchParams.append('limit', '1000');
+
+    return apiClient(`/content/flagged?${searchParams.toString()}`);
+  },
+
+  // Legacy methods for backward compatibility
+  getContentReports: async (params?: {
+    status?: string;
+    type?: 'post' | 'comment';
+  }): Promise<ApiResponse<{ reports: any[]; pagination: any }>> => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.type) searchParams.append('type', params.type);
+    // Remove pagination - fetch all data
+    searchParams.append('limit', '1000');
 
     return apiClient(`/content/reports?${searchParams.toString()}`);
   },

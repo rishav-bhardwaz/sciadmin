@@ -8,9 +8,12 @@ import {
   EyeIcon,
   TrashIcon,
   MagnifyingGlassIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'react-hot-toast';
 import { eventsApi, ApiError } from '../../lib/api';
+import DeleteEventModal from './DeleteEventModal';
 
 interface Event {
   id: string;
@@ -18,7 +21,7 @@ interface Event {
   description?: string;
   startDate: Date;
   endDate: Date;
-  status: 'draft' | 'published' | 'concluded' | 'cancelled';
+  status: 'draft' | 'published' | 'completed' | 'cancelled';
   registrations?: number;
   maxAttendees?: number;
   featuredImage?: string;
@@ -33,15 +36,19 @@ interface Event {
 }
 
 const getStatusBadge = (status: Event['status']) => {
-  const styles = {
+  const styles: Record<string, string> = {
     DRAFT: 'bg-gray-100 text-gray-800',
     PUBLISHED: 'bg-green-100 text-green-800',
-    CONCLUDED: 'bg-blue-100 text-blue-800',
+    COMPLETED: 'bg-blue-100 text-blue-800',
+    CONCLUDED: 'bg-blue-100 text-blue-800', // Support both for backward compatibility
     CANCELLED: 'bg-red-100 text-red-800',
   };
 
+  const statusUpper = status.toUpperCase();
+  const style = styles[statusUpper] || styles.DRAFT;
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status.toUpperCase()]}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${style}`}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
@@ -61,6 +68,14 @@ export default function EventsTable() {
     total: 0,
     pages: 0
   });
+  
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Status change state
+  const [changingStatus, setChangingStatus] = useState<string | null>(null);
 
   const fetchEvents = async () => {
     try {
@@ -77,12 +92,25 @@ export default function EventsTable() {
       const eventsData = response.success ? response.data?.events : response.events;
 
       if (eventsData && Array.isArray(eventsData)) {
-        const transformedEvents = eventsData.map((event: any) => ({
-          ...event,
-          startDate: new Date(event.startDateTime || event.startDate),
-          endDate: new Date(event.endDateTime || event.endDate),
-          registrations: event.registrationCount || event._count?.registrations || 0,
-        }));
+        const transformedEvents = eventsData.map((event: any) => {
+          // Normalize status to lowercase, handle both COMPLETED and CONCLUDED
+          let normalizedStatus = 'draft';
+          if (event.status) {
+            const statusUpper = event.status.toUpperCase();
+            if (statusUpper === 'CONCLUDED') {
+              normalizedStatus = 'completed'; // Map CONCLUDED to completed
+            } else {
+              normalizedStatus = event.status.toLowerCase();
+            }
+          }
+          return {
+            ...event,
+            status: normalizedStatus as Event['status'],
+            startDate: new Date(event.startDateTime || event.startDate),
+            endDate: new Date(event.endDateTime || event.endDate),
+            registrations: event.registrationCount || event._count?.registrations || 0,
+          };
+        });
         setEvents(transformedEvents);
 
         // Handle pagination
@@ -117,15 +145,48 @@ export default function EventsTable() {
       (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
   });
 
-  const handleDelete = async (eventId: string) => {
-    if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-      try {
-        await eventsApi.deleteEvent(eventId);
-        await fetchEvents();
-      } catch (err) {
-        console.error('Error deleting event:', err);
-        setError(err instanceof ApiError ? err.message : 'Failed to delete event');
-      }
+  const handleDeleteClick = (event: Event) => {
+    setEventToDelete(event);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!eventToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await eventsApi.deleteEvent(eventToDelete.id);
+      toast.success(`Event "${eventToDelete.title}" deleted successfully`);
+      setDeleteModalOpen(false);
+      setEventToDelete(null);
+      await fetchEvents();
+    } catch (err) {
+      console.error('Error deleting event:', err);
+      const errorMessage = err instanceof ApiError ? err.message : 'Failed to delete event';
+      toast.error(errorMessage);
+      setError(errorMessage);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false);
+    setEventToDelete(null);
+  };
+
+  const handleStatusChange = async (eventId: string, newStatus: string) => {
+    try {
+      setChangingStatus(eventId);
+      await eventsApi.updateEventStatus(eventId, newStatus.toUpperCase());
+      toast.success(`Event status changed to ${newStatus} successfully`);
+      await fetchEvents();
+    } catch (err) {
+      console.error('Error changing event status:', err);
+      const errorMessage = err instanceof ApiError ? err.message : 'Failed to change event status';
+      toast.error(errorMessage);
+    } finally {
+      setChangingStatus(null);
     }
   };
 
@@ -157,7 +218,7 @@ export default function EventsTable() {
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
               <option value="published">Published</option>
-              <option value="concluded">Concluded</option>
+              <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
@@ -284,10 +345,28 @@ export default function EventsTable() {
                       >
                         <PencilIcon className="h-4 w-4" />
                       </Link>
+                      <div className="relative">
+                        <select
+                          value={event.status}
+                          onChange={(e) => handleStatusChange(event.id, e.target.value)}
+                          disabled={changingStatus === event.id}
+                          className="text-xs border border-gray-300 rounded-md px-2 py-1 pr-6 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Change Status"
+                        >
+                          <option value="draft">Draft</option>
+                          <option value="published">Published</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                        {changingStatus === event.id && (
+                          <ArrowPathIcon className="absolute right-2 top-1.5 h-3 w-3 animate-spin text-gray-400" />
+                        )}
+                      </div>
                       <button
-                        onClick={() => handleDelete(event.id)}
-                        className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50"
+                        onClick={() => handleDeleteClick(event)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50 disabled:opacity-50"
                         title="Delete Event"
+                        disabled={isDeleting}
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -356,6 +435,19 @@ export default function EventsTable() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {eventToDelete && (
+        <DeleteEventModal
+          isOpen={deleteModalOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          eventTitle={eventToDelete.title}
+          eventId={eventToDelete.id}
+          registrationsCount={eventToDelete.registrations || 0}
+          isDeleting={isDeleting}
+        />
       )}
     </div>
   );

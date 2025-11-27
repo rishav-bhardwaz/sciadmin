@@ -17,6 +17,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { eventsApi } from '@/lib/api';
 
 /* ---------------------------
    Types & Zod Schemas
@@ -40,6 +41,7 @@ interface Speaker {
   company?: string;
   bio?: string;
   profileImage?: string;
+  order: number;
   socialLinks?: {
     linkedin?: string;
     twitter?: string;
@@ -71,6 +73,7 @@ const speakerSchema = z.object({
   company: z.string().optional(),
   bio: z.string().optional(),
   profileImage: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+  order: z.number().min(0, 'Order must not be less than 0'),
   socialLinks: z.object({
     linkedin: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
     twitter: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
@@ -90,11 +93,9 @@ const agendaItemSchema = z.object({
 const step1Schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
+  meetLink: z.string().min(1, 'Meet link is required'),
   startDateTime: z.string().min(1, 'Start date is required'),
   endDateTime: z.string().min(1, 'End date is required'),
-  venueType: z.enum(['ONLINE', 'PHYSICAL', 'HYBRID']),
-  location: z.string().optional(),
-  venueAddress: z.string().optional(),
 });
 
 const step2Schema = z.object({
@@ -121,107 +122,6 @@ const tabs = [
   { id: 'publish', name: 'Review & Publish', icon: CheckCircleIcon },
 ];
 
-/* ---------------------------
-   Dummy event data
-   --------------------------- */
-const DUMMY_EVENT = {
-  title: 'Tech Conference 2024',
-  description:
-    'Join us for an exciting tech conference featuring top experts in AI, cloud computing, cybersecurity, and innovation. Gain insights, hands-on experience, and network with professionals shaping the future of technology.',
-  startDate: '20-12-2024 09:00 AM',
-  endDate: '20-12-2024 05:00 PM',
-  venueType: 'HYBRID',
-  venueLocation: 'TechPark Auditorium, Bengaluru, India',
-  featuredImage:
-    'https://imgs.search.brave.com/dG2Ov7Z4dgrAwWt3ZDiUWt9wMUxZrUSw8Wf_ZEaRqN4/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YS5nZXR0eWltYWdl/cy5jb20vaWQvMTQ4/MzQ4NzA0Mi9waG90/by9wb3J0cmFpdC1v/Zi1hLWZlbWFsZS1h/dmF0YXItbWFkZS1m/b3Itd2ViMy1hbmQt/dGhlLW1ldGF2ZXJz/ZS5qcGc_cz02MTJ4/NjEyJnc9MCZrPTIw/JmM9UEN0a3lEb1FI/WjNXWl96em9rckIw/N0YzblMxRWpWQ2hL/RHE2SWxYcUF6bz0',
-  isFree: false,
-  ticketPrice: '₹1,499',
-  capacity: 250,
-  registrationFields: [
-    { fieldName: 'Full Name', placeholder: 'Enter your full name' },
-    { fieldName: 'Email', placeholder: 'Enter your email address' },
-    { fieldName: 'Phone Number', placeholder: 'Enter your contact number' },
-    { fieldName: 'Organization', placeholder: 'Your company or institution' },
-  ],
-  speakers: [
-    {
-      name: 'Dr. Jane Smith',
-      title: 'AI Research Director',
-      company: 'TechCorp',
-      profileImg:
-        'https://imgs.search.brave.com/GAMU3dRtcBIISUDbnMKfpkmQ5pUBBPEOEIz9vKrHc0w/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE1LzQwLzM2LzI3/LzM2MF9GXzE1NDAz/NjI3ODhfN2h4QWt1/Y0dEbkg1TE9RRzhH/RU03REtSY09MY0lW/T1EuanBn',
-      social: {
-        linkedin: 'https://linkedin.com/',
-        twitter: 'https://twitter.com/',
-        website: 'https://techcorp.com',
-      },
-    },
-    {
-      name: 'Arjun Mehta',
-      title: 'Cloud Architect',
-      company: 'Google Cloud India',
-      profileImg:
-        'https://imgs.search.brave.com/GAMU3dRtcBIISUDbnMKfpkmQ5pUBBPEOEIz9vKrHc0w/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE1LzQwLzM2LzI3/LzM2MF9GXzE1NDAz/NjI3ODhfN2h4QWt1/Y0dEbkg1TE9RRzhH/RU03REtSY09MY0lW/T1EuanBn',
-      social: {
-        linkedin: 'https://linkedin.com/in/arjunmehta',
-        twitter: 'https://twitter.com/arjunmehta',
-        website: 'https://cloud.google.com',
-      },
-    },
-    {
-      name: 'Sara Johnson',
-      title: 'Cybersecurity Analyst',
-      company: 'SecureNet',
-      profileImg:
-        'https://imgs.search.brave.com/GAMU3dRtcBIISUDbnMKfpkmQ5pUBBPEOEIz9vKrHc0w/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE1LzQwLzM2LzI3/LzM2MF9GXzE1NDAz/NjI3ODhfN2h4QWt1/Y0dEbkg1TE9RRzhH/RU03REtSY09MY0lW/T1EuanBn',
-      social: {
-        linkedin: 'https://linkedin.com/in/sarajohnson',
-        twitter: 'https://twitter.com/sarajohnson',
-        website: 'https://securenet.com',
-      },
-    },
-  ],
-  agenda: [
-    {
-      title: 'Opening Keynote: The Future of AI',
-      startTime: '20-12-2024 09:30 AM',
-      endTime: '20-12-2024 11:00 AM',
-      speaker: 'Dr. Jane Smith',
-      type: 'KEYNOTE',
-      description:
-        'An inspiring session exploring the evolution of artificial intelligence and how it is reshaping industries globally.',
-    },
-    {
-      title: 'Hands-On Cloud Workshop',
-      startTime: '20-12-2024 11:30 AM',
-      endTime: '20-12-2024 01:00 PM',
-      speaker: 'Arjun Mehta',
-      type: 'WORKSHOP',
-      description:
-        'Learn how to deploy scalable cloud infrastructure on Google Cloud with practical demonstrations.',
-    },
-    {
-      title: 'Cybersecurity in 2024: Trends and Challenges',
-      startTime: '20-12-2024 02:00 PM',
-      endTime: '20-12-2024 03:30 PM',
-      speaker: 'Sara Johnson',
-      type: 'PANEL',
-      description:
-        'A discussion on emerging cybersecurity threats, zero trust frameworks, and data protection best practices.',
-    },
-  ],
-  organizer: {
-    name: 'Global Tech Community',
-    contactEmail: 'contact@globaltechconf.com',
-    website: 'https://globaltechconf.com',
-  },
-  sponsors: [
-    { name: 'TechCorp', logo: 'https://logos-world.net/wp-content/uploads/2020/09/Google-Logo.png' },
-    { name: 'SecureNet', logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg' },
-    { name: 'CloudWorks', logo: 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg' },
-  ],
-  tags: ['AI', 'Cloud', 'Cybersecurity', 'Innovation', 'Networking'],
-};
 
 /* ---------------------------
    Helper: Parse "20-12-2024 09:00 AM" -> "2024-12-20T09:00"
@@ -271,11 +171,9 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
     defaultValues: {
       title: '',
       description: '',
+      meetLink: '',
       startDateTime: '',
       endDateTime: '',
-      venueType: 'ONLINE',
-      location: '',
-      venueAddress: '',
     },
   });
 
@@ -287,10 +185,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
       maxAttendees: 100,
       price: 0,
       isFree: true,
-      registrationFields: [
-        { fieldName: 'Full Name', fieldType: 'TEXT', isRequired: true, placeholder: 'Enter your full name', order: 1 },
-        { fieldName: 'Email', fieldType: 'EMAIL', isRequired: true, placeholder: 'Enter your email address', order: 2 },
-      ],
+      registrationFields: [],
     },
   });
 
@@ -303,12 +198,9 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
     },
   });
 
-  // Field arrays for step 2
+  // Field arrays for step 2 (kept for schema validation, but always sends empty array)
   const {
     fields: registrationFields,
-    append: appendRegistrationField,
-    remove: removeRegistrationField,
-    replace: replaceRegistrationFields,
   } = useFieldArray({
     control: step2Form.control,
     name: 'registrationFields',
@@ -335,7 +227,6 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
     name: 'agenda',
   });
 
-  const venueType = step1Form.watch('venueType');
   const isFree = step2Form.watch('isFree');
 
   const goToStep = (step: number) => {
@@ -352,91 +243,78 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
   }, [step1Form.formState.isValid, step2Form.formState.isValid, step3Form.formState.isValid]);
 
   /* ---------------------------
-     Simulate fetching event data and populate forms
+     Fetch event data from API and populate forms
      --------------------------- */
   useEffect(() => {
-    setLoading(true);
-    const t = setTimeout(() => {
-      const evt = DUMMY_EVENT;
+    const fetchEventData = async () => {
+      if (!eventId) return;
+      
+      try {
+        setLoading(true);
+        const response = await eventsApi.getEventById(eventId);
+        const evt = response.data || response;
 
-      // Step 1 mapping
-      step1Form.reset({
-        title: evt.title || '',
-        description: evt.description || '',
-        startDateTime: parseCustomDateToDatetimeLocal(evt.startDate || ''),
-        endDateTime: parseCustomDateToDatetimeLocal(evt.endDate || ''),
-        venueType: (evt.venueType as VenueType) || 'ONLINE',
-        location: evt.venueLocation || '',
-        venueAddress: '',
-      });
+        // Step 1 mapping
+        step1Form.reset({
+          title: evt.title || '',
+          description: evt.description || '',
+          meetLink: evt.meetLink || '',
+          startDateTime: evt.startDateTime ? parseCustomDateToDatetimeLocal(evt.startDateTime) : '',
+          endDateTime: evt.endDateTime ? parseCustomDateToDatetimeLocal(evt.endDateTime) : '',
+        });
 
-      // Step 2 mapping
-      const parsedPrice = (() => {
-        try {
-          if (!evt.ticketPrice) return 0;
-          const digits = evt.ticketPrice.replace(/[^\d.]/g, '');
-          return digits ? Number(digits) : 0;
-        } catch {
-          return 0;
-        }
-      })();
+        // Step 2 mapping
+        step2Form.reset({
+          category: evt.category || '',
+          featuredImage: evt.featuredImage || '',
+          maxAttendees: evt.maxAttendees || 100,
+          price: evt.price || 0,
+          isFree: evt.isFree !== undefined ? evt.isFree : true,
+          registrationFields: [],
+        });
 
-      const registrationMapped = (evt.registrationFields || []).map(
-        (rf: any, idx: number): RegistrationField => ({
-          fieldName: rf.fieldName || '',
-          fieldType: 'TEXT',
-          isRequired: false,
-          placeholder: rf.placeholder || '',
-          options: [],
-          order: idx + 1,
-        })
-      );
+        // Step 3 mapping
+        const speakersMapped = (evt.speakers || []).map((s: any, index: number) => ({
+          name: s.name || '',
+          title: s.title || '',
+          company: s.company || '',
+          bio: s.bio || '',
+          profileImage: s.profileImage || s.profileImg || '',
+          order: s.order !== undefined ? s.order : index,
+          socialLinks: {
+            linkedin: s.socialLinks?.linkedin || s.social?.linkedin || '',
+            twitter: s.socialLinks?.twitter || s.social?.twitter || '',
+            website: s.socialLinks?.website || s.social?.website || '',
+          },
+        }));
 
-      step2Form.reset({
-        featuredImage: evt.featuredImage || '',
-        maxAttendees: evt.capacity || 100,
-        price: parsedPrice,
-        isFree: !!evt.isFree,
-        registrationFields: registrationMapped,
-      });
+        const agendaMapped = (evt.agenda || []).map((a: any) => ({
+          title: a.title || '',
+          description: a.description || '',
+          startTime: a.startTime ? parseCustomDateToDatetimeLocal(a.startTime) : '',
+          endTime: a.endTime ? parseCustomDateToDatetimeLocal(a.endTime) : '',
+          speakerName: a.speakerName || a.speaker || '',
+          sessionType: (a.sessionType || a.type || 'WORKSHOP') as SessionType,
+        }));
 
-      // Step 3 mapping
-      const speakersMapped = (evt.speakers || []).map((s: any) => ({
-        name: s.name || '',
-        title: s.title || '',
-        company: s.company || '',
-        bio: s.bio || '',
-        profileImage: s.profileImg || '',
-        socialLinks: {
-          linkedin: s.social?.linkedin || '',
-          twitter: s.social?.twitter || '',
-          website: s.social?.website || '',
-        },
-      }));
+        step3Form.reset({
+          speakers: speakersMapped,
+          agenda: agendaMapped,
+        });
 
-      const agendaMapped = (evt.agenda || []).map((a: any) => ({
-        title: a.title || '',
-        description: a.description || '',
-        startTime: parseCustomDateToDatetimeLocal(a.startTime || ''),
-        endTime: parseCustomDateToDatetimeLocal(a.endTime || ''),
-        speakerName: a.speaker || '',
-        sessionType: (a.type || 'WORKSHOP') as SessionType,
-      }));
+        replaceSpeakers(speakersMapped);
+        replaceAgenda(agendaMapped);
 
-      step3Form.reset({
-        speakers: speakersMapped,
-        agenda: agendaMapped,
-      });
+        setCompletedSteps([1]);
+      } catch (error: any) {
+        console.error('Error fetching event:', error);
+        toast.error(error.message || 'Failed to load event data');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      replaceRegistrationFields(registrationMapped);
-      replaceSpeakers(speakersMapped);
-      replaceAgenda(agendaMapped);
-
-      setCompletedSteps([1]);
-      setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(t);
+    fetchEventData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
@@ -446,6 +324,11 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
   const onSubmitStep1 = async (data: Step1Data) => {
     try {
       setIsSubmitting(true);
+      // Always send ONLINE venue type
+      const dataWithVenueType = {
+        ...data,
+        venueType: 'ONLINE' as const,
+      };
       await new Promise((res) => setTimeout(res, 800)); // simulate API
       setCompletedSteps((prev) => Array.from(new Set([...prev, 1])));
       toast.success('Basic details saved successfully!');
@@ -464,6 +347,11 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         return;
       }
       setIsSubmitting(true);
+      // Always send empty registration fields
+      const dataWithEmptyFields = {
+        ...data,
+        registrationFields: [],
+      };
       await new Promise((res) => setTimeout(res, 800));
       setCompletedSteps((prev) => Array.from(new Set([...prev, 2])));
       toast.success('Configuration saved successfully!');
@@ -482,6 +370,17 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         return;
       }
       setIsSubmitting(true);
+      // Ensure all speakers have the order field set correctly
+      const speakersWithOrder = data.speakers.map((speaker, index) => ({
+        ...speaker,
+        order: speaker.order !== undefined ? speaker.order : index,
+      }));
+      
+      const dataWithOrder = {
+        ...data,
+        speakers: speakersWithOrder,
+      };
+      
       await new Promise((res) => setTimeout(res, 800));
       setCompletedSteps((prev) => Array.from(new Set([...prev, 3])));
       toast.success('Speakers and agenda saved successfully!');
@@ -605,23 +504,15 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
   /* ---------------------------
      Helpers to add fields
      --------------------------- */
-  const addRegistrationField = () => {
-    appendRegistrationField({
-      fieldName: '',
-      fieldType: 'TEXT',
-      isRequired: false,
-      placeholder: '',
-      order: registrationFields.length + 1,
-    });
-  };
-
   const addSpeaker = () => {
+    const currentSpeakers = step3Form.getValues('speakers');
     appendSpeaker({
       name: '',
       title: '',
       company: '',
       bio: '',
       profileImage: '',
+      order: currentSpeakers.length,
       socialLinks: {
         linkedin: '',
         twitter: '',
@@ -726,6 +617,23 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
           )}
         </div>
 
+        {/* Meet Link */}
+        <div>
+          <label htmlFor="meetLink" className="block text-sm font-medium text-gray-700">
+            Meet Link <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="url"
+            id="meetLink"
+            {...step1Form.register('meetLink')}
+            className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
+            placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          />
+          {step1Form.formState.errors.meetLink && (
+            <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.meetLink.message}</p>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="startDateTime" className="block text-sm font-medium text-gray-700">
@@ -759,62 +667,6 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
 
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Venue Type <span className="text-red-500">*</span>
-          </label>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {[
-              { value: 'ONLINE', label: 'Online', icon: '🌐' },
-              { value: 'PHYSICAL', label: 'In-Person', icon: '🏢' },
-              { value: 'HYBRID', label: 'Hybrid', icon: '🔀' },
-            ].map((option) => (
-              <label
-                key={option.value}
-                className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm transition ${venueType === option.value
-                  ? 'border-gray-600 ring-2 ring-gray-500'
-                  : 'border-gray-300 hover:border-gray-400'
-                  }`}
-              >
-                <input type="radio" className="sr-only" value={option.value} {...step1Form.register('venueType')} />
-                <div className="flex flex-col items-center w-full">
-                  <span className="text-2xl mb-2">{option.icon}</span>
-                  <span className="block text-sm font-medium text-gray-900">{option.label}</span>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {venueType !== 'ONLINE' && (
-          <>
-            <div>
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location
-              </label>
-              <input
-                type="text"
-                id="location"
-                {...step1Form.register('location')}
-                className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                placeholder="Convention Center"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="venueAddress" className="block text-sm font-medium text-gray-700">
-                Venue Address
-              </label>
-              <input
-                type="text"
-                id="venueAddress"
-                {...step1Form.register('venueAddress')}
-                className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                placeholder="123 Main St, City, Country"
-              />
-            </div>
-          </>
-        )}
       </div>
 
       <div className="flex justify-end pt-4">
@@ -918,85 +770,6 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Registration Form</h3>
-            <button
-              type="button"
-              onClick={addRegistrationField}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            >
-              <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
-              Add Field
-            </button>
-          </div>
-          <p className="mt-1 text-sm text-gray-500">Customize the registration form fields for attendees.</p>
-
-          <div className="mt-4 space-y-4">
-            {registrationFields.map((field, index) => (
-              <div key={field.id} className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg">
-                <div className="flex-1 space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Field Name</label>
-                      <input
-                        type="text"
-                        {...step2Form.register(`registrationFields.${index}.fieldName` as const)}
-                        className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                        placeholder="e.g., Phone Number"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Field Type</label>
-                      <select
-                        {...step2Form.register(`registrationFields.${index}.fieldType` as const)}
-                        className="mt-1 block w-full rounded-md border border-gray-400 text-black shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                      >
-                        <option value="TEXT">Text</option>
-                        <option value="EMAIL">Email</option>
-                        <option value="PHONE">Phone</option>
-                        <option value="SELECT">Dropdown</option>
-                        <option value="CHECKBOX">Checkbox</option>
-                        <option value="RADIO">Radio Buttons</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Placeholder</label>
-                    <input
-                      type="text"
-                      {...step2Form.register(`registrationFields.${index}.placeholder` as const)}
-                      className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                      placeholder="Enter placeholder text"
-                    />
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      id={`required-${index}`}
-                      type="checkbox"
-                      {...step2Form.register(`registrationFields.${index}.isRequired` as const)}
-                      className="h-4 w-4 rounded border-gray-300 text-gray-600 focus:ring-gray-500"
-                    />
-                    <label htmlFor={`required-${index}`} className="ml-2 block text-sm text-gray-700">
-                      Required field
-                    </label>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => removeRegistrationField(index)}
-                  className="flex-shrink-0 p-2 text-red-600 hover:text-red-800"
-                >
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="flex justify-between pt-4">

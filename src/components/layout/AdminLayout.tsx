@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
@@ -36,9 +36,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <AnimatePresence mode="wait">
-              {children}
-            </AnimatePresence>
+            {children}
           </motion.div>
         </motion.main>
       </div>

@@ -3,6 +3,7 @@
 import { BellIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../auth/AuthProvider';
 
 interface HeaderProps {
   title: string;
@@ -11,6 +12,7 @@ interface HeaderProps {
 export default function Header({ title }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { logout } = useAuth();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -22,10 +24,9 @@ export default function Header({ title }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.clear()
-    setMenuOpen(false)
-    window.location.href = "/login";
+  const handleLogout = async () => {
+    setMenuOpen(false);
+    await logout();
   }
 
   return (

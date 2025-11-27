@@ -36,6 +36,7 @@ export interface Speaker {
   company?: string;
   bio?: string;
   profileImage?: string;
+  order: number;
   socialLinks?: {
     linkedin?: string;
     twitter?: string;

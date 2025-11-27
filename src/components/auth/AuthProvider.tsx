@@ -35,42 +35,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = localStorage.getItem('adminToken');
       const storedUser = localStorage.getItem('adminUser');
 
-      if (authStatus === 'true' && token) {
-        // First, set auth state from localStorage to avoid login redirect
-        setIsAuthenticated(true);
-        
-        // If we have stored user data, use it immediately
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-          } catch (e) {
-            console.error('Error parsing stored user data:', e);
-          }
-        }
-
-        // Then verify token in background (don't clear auth on failure)
-        try {
-          const response = await authApi.getProfile();
-          if (response.success && response.data) {
-            setUser(response.data);
-            // Update stored user data
-            localStorage.setItem('adminUser', JSON.stringify(response.data));
-          }
-        } catch (profileError) {
-          console.warn('Profile fetch failed, but keeping user logged in:', profileError);
-          // Don't clear auth state - token might still be valid for other operations
-        }
-      }
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-      // Only clear auth state if there's no token at all
-      const token = localStorage.getItem('adminToken');
-      if (!token) {
+      // Strict check: if no token or auth status, immediately set as unauthenticated
+      if (!token || authStatus !== 'true') {
         localStorage.removeItem('adminAuth');
+        localStorage.removeItem('adminToken');
         localStorage.removeItem('adminUser');
         setIsAuthenticated(false);
         setUser(null);
+        setIsLoading(false);
+        return;
       }
+
+      // If we have a token and auth status, set authenticated
+      setIsAuthenticated(true);
+      
+      // If we have stored user data, use it immediately
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error('Error parsing stored user data:', e);
+        }
+      }
+
+      // Then verify token in background (don't clear auth on failure)
+      try {
+        const response = await authApi.getProfile();
+        if (response.success && response.data) {
+          setUser(response.data);
+          // Update stored user data
+          localStorage.setItem('adminUser', JSON.stringify(response.data));
+        }
+      } catch (profileError) {
+        console.warn('Profile fetch failed, but keeping user logged in:', profileError);
+        // Don't clear auth state - token might still be valid for other operations
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      // Clear auth state on any error
+      localStorage.removeItem('adminAuth');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      setIsAuthenticated(false);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }

@@ -39,6 +39,7 @@ interface Speaker {
   company?: string;
   bio?: string;
   profileImage?: string;
+  order: number;
   socialLinks?: {
     linkedin?: string;
     twitter?: string;
@@ -71,6 +72,7 @@ const speakerSchema = z.object({
   company: z.string().optional(),
   bio: z.string().optional(),
   profileImage: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+  order: z.number().min(0, 'Order must not be less than 0'),
   socialLinks: z.object({
     linkedin: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
     twitter: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
@@ -91,12 +93,9 @@ const agendaItemSchema = z.object({
 const step1Schema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
-  meetLink: z.string(),
+  meetLink: z.string().min(1, 'Meet link is required'),
   startDateTime: z.string().min(1, 'Start date is required'),
   endDateTime: z.string().min(1, 'End date is required'),
-  venueType: z.enum(['ONLINE', 'PHYSICAL', 'HYBRID']),
-  location: z.string().optional(),
-  venueAddress: z.string().optional(),
 });
 
 const step2Schema = z.object({
@@ -138,9 +137,6 @@ export default function EventForm() {
       title: '',
       description: '',
       meetLink: "",
-      venueType: 'ONLINE',
-      location: '',
-      venueAddress: '',
     },
   });
 
@@ -153,10 +149,7 @@ export default function EventForm() {
       maxAttendees: 100,
       price: 0,
       isFree: true,
-      registrationFields: [
-        { fieldName: 'Full Name', fieldType: 'TEXT', isRequired: true, placeholder: 'Enter your full name', order: 1 },
-        { fieldName: 'Email', fieldType: 'EMAIL', isRequired: true, placeholder: 'Enter your email address', order: 2 },
-      ],
+      registrationFields: [],
     },
   });
 
@@ -169,11 +162,9 @@ export default function EventForm() {
     },
   });
 
-  // Field arrays for step 2
+  // Field arrays for step 2 (kept for schema validation, but always sends empty array)
   const {
     fields: registrationFields,
-    append: appendRegistrationField,
-    remove: removeRegistrationField,
   } = useFieldArray({
     control: step2Form.control,
     name: 'registrationFields',
@@ -199,7 +190,6 @@ export default function EventForm() {
   });
 
   // Watch values
-  const venueType = step1Form.watch('venueType');
   const isFree = step2Form.watch('isFree');
 
   const goToStep = (step: number) => {
@@ -214,7 +204,12 @@ export default function EventForm() {
   const onSubmitStep1 = async (data: Step1Data) => {
     try {
       setIsSubmitting(true);
-      const result = await eventsApi.createEventStep1(data);
+      // Always send ONLINE venue type
+      const dataWithVenueType = {
+        ...data,
+        venueType: 'ONLINE' as const,
+      };
+      const result = await eventsApi.createEventStep1(dataWithVenueType);
 
       // Check if we have a direct event object or wrapped response
       if (result.success || result.id) {
@@ -242,7 +237,12 @@ export default function EventForm() {
 
     try {
       setIsSubmitting(true);
-      const result = await eventsApi.updateEventStep2(eventId, data);
+      // Always send empty registration fields
+      const dataWithEmptyFields = {
+        ...data,
+        registrationFields: [],
+      };
+      const result = await eventsApi.updateEventStep2(eventId, dataWithEmptyFields);
 
       if (result.success || result.id || result.updatedAt) {
         setCompletedSteps([...completedSteps, 2]);
@@ -267,7 +267,18 @@ export default function EventForm() {
 
     try {
       setIsSubmitting(true);
-      const result = await eventsApi.updateEventStep3(eventId, data);
+      // Ensure all speakers have the order field set correctly
+      const speakersWithOrder = data.speakers.map((speaker, index) => ({
+        ...speaker,
+        order: speaker.order !== undefined ? speaker.order : index,
+      }));
+      
+      const dataWithOrder = {
+        ...data,
+        speakers: speakersWithOrder,
+      };
+      
+      const result = await eventsApi.updateEventStep3(eventId, dataWithOrder);
 
       if (result.success || result.id || result.updatedAt) {
         setCompletedSteps([...completedSteps, 3]);
@@ -315,23 +326,15 @@ export default function EventForm() {
   };
 
   // Helper functions
-  const addRegistrationField = () => {
-    appendRegistrationField({
-      fieldName: '',
-      fieldType: 'TEXT',
-      isRequired: false,
-      placeholder: '',
-      order: registrationFields.length + 1,
-    });
-  };
-
   const addSpeaker = () => {
+    const currentSpeakers = step3Form.getValues('speakers');
     appendSpeaker({
       name: '',
       title: '',
       company: '',
       bio: '',
       profileImage: '',
+      order: currentSpeakers.length,
       socialLinks: {
         linkedin: '',
         twitter: '',
@@ -396,15 +399,18 @@ export default function EventForm() {
         {/* Meet Link */}
         <div className="mt-4">
           <label htmlFor="meetLink" className="block text-sm font-medium text-gray-700">
-            Meet Link
+            Meet Link <span className="text-red-500">*</span>
           </label>
           <input
             type="url"
             id="meetLink"
             {...step1Form.register('meetLink')}
             className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-            placeholder="https://example.com/event-banner.jpg"
+            placeholder="https://meet.google.com/xxx-xxxx-xxx"
           />
+          {step1Form.formState.errors.meetLink && (
+            <p className="mt-1 text-sm text-red-600">{step1Form.formState.errors.meetLink.message}</p>
+          )}
         </div>
 
         {/* Date & Time */}
@@ -440,69 +446,6 @@ export default function EventForm() {
           </div>
         </div>
 
-        {/* Venue Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Venue Type <span className="text-red-500">*</span>
-          </label>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {[
-              { value: "ONLINE", label: "Online", icon: "🌐" },
-              { value: "PHYSICAL", label: "In-Person", icon: "🏢" },
-              { value: "HYBRID", label: "Hybrid", icon: "🔀" },
-            ].map((option) => (
-              <label
-                key={option.value}
-                className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm transition ${venueType === option.value
-                  ? "border-gray-600 ring-2 ring-gray-500"
-                  : "border-gray-300 hover:border-gray-400"
-                  }`}
-              >
-                <input
-                  type="radio"
-                  className="sr-only"
-                  value={option.value}
-                  {...step1Form.register("venueType")}
-                />
-                <div className="flex flex-col items-center w-full">
-                  <span className="text-2xl mb-2">{option.icon}</span>
-                  <span className="block text-sm font-medium text-gray-900">{option.label}</span>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Location Fields */}
-        {venueType !== "ONLINE" && (
-          <>
-            <div>
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location
-              </label>
-              <input
-                type="text"
-                id="location"
-                {...step1Form.register("location")}
-                className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                placeholder="Convention Center"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="venueAddress" className="block text-sm font-medium text-gray-700">
-                Venue Address
-              </label>
-              <input
-                type="text"
-                id="venueAddress"
-                {...step1Form.register("venueAddress")}
-                className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                placeholder="123 Main St, City, Country"
-              />
-            </div>
-          </>
-        )}
       </div>
 
       {/* Submit Button */}
@@ -643,102 +586,6 @@ export default function EventForm() {
           </div>
         </div>
 
-        {/* Registration Form */}
-        <div>
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Registration Form</h3>
-            <button
-              type="button"
-              onClick={addRegistrationField}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            >
-              <PlusIcon className="-ml-1 mr-1 h-4 w-4" />
-              Add Field
-            </button>
-          </div>
-          <p className="mt-1 text-sm text-gray-500">
-            Customize the registration form fields for attendees.
-          </p>
-
-          <div className="mt-4 space-y-4">
-            {registrationFields.map((field, index) => (
-              <div
-                key={field.id}
-                className="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg"
-              >
-                <div className="flex-1 space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {/* Field Name */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Field Name
-                      </label>
-                      <input
-                        type="text"
-                        {...step2Form.register(`registrationFields.${index}.fieldName` as const)}
-                        className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                        placeholder="e.g., Phone Number"
-                      />
-                    </div>
-
-                    {/* Field Type */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Field Type
-                      </label>
-                      <select
-                        {...step2Form.register(`registrationFields.${index}.fieldType` as const)}
-                        className="mt-1 block w-full rounded-md border border-gray-400 text-black shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                      >
-                        <option value="TEXT">Text</option>
-                        <option value="EMAIL">Email</option>
-                        <option value="PHONE">Phone</option>
-                        <option value="SELECT">Dropdown</option>
-                        <option value="CHECKBOX">Checkbox</option>
-                        <option value="RADIO">Radio Buttons</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Placeholder */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Placeholder
-                    </label>
-                    <input
-                      type="text"
-                      {...step2Form.register(`registrationFields.${index}.placeholder` as const)}
-                      className="mt-1 block w-full rounded-md border border-gray-400 text-black placeholder-gray-500 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
-                      placeholder="Enter placeholder text"
-                    />
-                  </div>
-
-                  {/* Required Checkbox */}
-                  <div className="flex items-center">
-                    <input
-                      id={`required-${index}`}
-                      type="checkbox"
-                      {...step2Form.register(`registrationFields.${index}.isRequired` as const)}
-                      className="h-4 w-4 rounded border-gray-300 text-gray-600 focus:ring-gray-500"
-                    />
-                    <label htmlFor={`required-${index}`} className="ml-2 block text-sm text-gray-700">
-                      Required field
-                    </label>
-                  </div>
-                </div>
-
-                {/* Remove Button */}
-                <button
-                  type="button"
-                  onClick={() => removeRegistrationField(index)}
-                  className="flex-shrink-0 p-2 text-red-600 hover:text-red-800"
-                >
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Footer Buttons */}
