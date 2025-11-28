@@ -8,7 +8,7 @@ import {
   CalendarIcon,
   // UsersIcon,
   DocumentTextIcon,
-  CogIcon,
+  // CogIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';

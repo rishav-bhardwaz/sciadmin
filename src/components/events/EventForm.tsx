@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import {
   DocumentTextIcon,
-  PhotoIcon,
+  // PhotoIcon,
   UserGroupIcon,
   CogIcon,
   PlusIcon,
@@ -54,6 +54,7 @@ interface AgendaItem {
   endTime: string;
   speakerName?: string;
   sessionType: SessionType;
+  order: number;
 }
 
 // Form Schemas based on backend API
@@ -87,6 +88,7 @@ const agendaItemSchema = z.object({
   endTime: z.string().min(1, 'End time is required'),
   speakerName: z.string().optional(),
   sessionType: z.enum(['KEYNOTE', 'PANEL', 'WORKSHOP', 'BREAK', 'NETWORKING']),
+  order: z.number().min(0, 'Order must not be less than 0'),
 });
 
 // Step Schemas matching backend API exactly
@@ -273,9 +275,16 @@ export default function EventForm() {
         order: speaker.order !== undefined ? speaker.order : index,
       }));
       
+      // Ensure all agenda items have the order field set correctly
+      const agendaWithOrder = data.agenda.map((agendaItem, index) => ({
+        ...agendaItem,
+        order: agendaItem.order !== undefined ? agendaItem.order : index,
+      }));
+      
       const dataWithOrder = {
         ...data,
         speakers: speakersWithOrder,
+        agenda: agendaWithOrder,
       };
       
       const result = await eventsApi.updateEventStep3(eventId, dataWithOrder);
@@ -344,6 +353,7 @@ export default function EventForm() {
   };
 
   const addAgendaItem = () => {
+    const currentAgenda = step3Form.getValues('agenda');
     appendAgendaItem({
       title: '',
       description: '',
@@ -351,6 +361,7 @@ export default function EventForm() {
       endTime: '',
       speakerName: '',
       sessionType: 'WORKSHOP',
+      order: currentAgenda.length,
     });
   };
 

@@ -56,6 +56,7 @@ interface AgendaItem {
   endTime: string;
   speakerName?: string;
   sessionType: SessionType;
+  order: number;
 }
 
 const registrationFieldSchema = z.object({
@@ -88,6 +89,7 @@ const agendaItemSchema = z.object({
   endTime: z.string().min(1, 'End time is required'),
   speakerName: z.string().optional(),
   sessionType: z.enum(['KEYNOTE', 'PANEL', 'WORKSHOP', 'BREAK', 'NETWORKING']),
+  order: z.number().min(0, 'Order must not be less than 0'),
 });
 
 const step1Schema = z.object({
@@ -288,13 +290,14 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
           },
         }));
 
-        const agendaMapped = (evt.agenda || []).map((a: any) => ({
+        const agendaMapped = (evt.agenda || []).map((a: any, index: number) => ({
           title: a.title || '',
           description: a.description || '',
           startTime: a.startTime ? parseCustomDateToDatetimeLocal(a.startTime) : '',
           endTime: a.endTime ? parseCustomDateToDatetimeLocal(a.endTime) : '',
           speakerName: a.speakerName || a.speaker || '',
           sessionType: (a.sessionType || a.type || 'WORKSHOP') as SessionType,
+          order: a.order !== undefined ? a.order : index,
         }));
 
         step3Form.reset({
@@ -376,9 +379,16 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         order: speaker.order !== undefined ? speaker.order : index,
       }));
       
+      // Ensure all agenda items have the order field set correctly
+      const agendaWithOrder = data.agenda.map((agendaItem, index) => ({
+        ...agendaItem,
+        order: agendaItem.order !== undefined ? agendaItem.order : index,
+      }));
+      
       const dataWithOrder = {
         ...data,
         speakers: speakersWithOrder,
+        agenda: agendaWithOrder,
       };
       
       await new Promise((res) => setTimeout(res, 800));
@@ -522,6 +532,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
   };
 
   const addAgendaItem = () => {
+    const currentAgenda = step3Form.getValues('agenda');
     appendAgendaItem({
       title: '',
       description: '',
@@ -529,6 +540,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
       endTime: '',
       speakerName: '',
       sessionType: 'WORKSHOP',
+      order: currentAgenda.length,
     });
   };
 

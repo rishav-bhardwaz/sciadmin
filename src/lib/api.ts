@@ -101,6 +101,29 @@ const apiClient = async <T>(
     });
 
     if (!response.ok) {
+      // Handle authentication errors (401 Unauthorized, 403 Forbidden)
+      if (response.status === 401 || response.status === 403) {
+        // Check if error message indicates token expiration or invalidity
+        const errorMessage = (data.message || '').toLowerCase();
+        const isTokenError = 
+          errorMessage.includes('token') ||
+          errorMessage.includes('expired') ||
+          errorMessage.includes('invalid') ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('forbidden');
+
+        if (isTokenError || response.status === 401) {
+          // Clear auth tokens
+          removeAuthToken();
+          
+          // Redirect to login page (only if we're not already on login page)
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            console.warn('Token expired or invalid. Redirecting to login...');
+            window.location.href = '/login';
+          }
+        }
+      }
+
       throw new ApiError(
         response.status, 
         data.message || 'API Error', 
@@ -111,6 +134,22 @@ const apiClient = async <T>(
     return data;
   } catch (error) {
     if (error instanceof ApiError) {
+      // Re-throw ApiError, but handle 401/403 if not already handled
+      if ((error.status === 401 || error.status === 403) && typeof window !== 'undefined') {
+        const errorMessage = (error.message || '').toLowerCase();
+        const isTokenError = 
+          errorMessage.includes('token') ||
+          errorMessage.includes('expired') ||
+          errorMessage.includes('invalid') ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('forbidden');
+
+        if (isTokenError && !window.location.pathname.includes('/login')) {
+          removeAuthToken();
+          console.warn('Token expired or invalid. Redirecting to login...');
+          window.location.href = '/login';
+        }
+      }
       throw error;
     }
     throw new ApiError(500, 'Network Error');

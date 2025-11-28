@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Then verify token in background (don't clear auth on failure)
+      // Then verify token in background
       try {
         const response = await authApi.getProfile();
         if (response.success && response.data) {
@@ -67,8 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('adminUser', JSON.stringify(response.data));
         }
       } catch (profileError) {
-        console.warn('Profile fetch failed, but keeping user logged in:', profileError);
-        // Don't clear auth state - token might still be valid for other operations
+        // If it's an auth error (401/403), clear auth state
+        if (profileError instanceof ApiError && (profileError.status === 401 || profileError.status === 403)) {
+          console.warn('Token expired or invalid. Clearing auth state...');
+          localStorage.removeItem('adminAuth');
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUser');
+          setIsAuthenticated(false);
+          setUser(null);
+        } else {
+          console.warn('Profile fetch failed, but keeping user logged in:', profileError);
+        }
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
