@@ -89,11 +89,11 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
           <div className="flex justify-between items-start mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Report Details</h2>
-              <p className="text-sm text-gray-500 mt-1">ID: {report.id}</p>
+              <p className="text-sm text-gray-700 mt-1">ID: {report.id}</p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-600 hover:text-gray-900"
             >
               <XCircleIcon className="h-6 w-6" />
             </button>
@@ -118,9 +118,9 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
               <label className="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
               <div className="flex items-center space-x-2">
                 {report.reportType === 'POST' ? (
-                  <DocumentTextIcon className="h-5 w-5 text-gray-400" />
+                  <DocumentTextIcon className="h-5 w-5 text-gray-600" />
                 ) : (
-                  <UserIcon className="h-5 w-5 text-gray-400" />
+                  <UserIcon className="h-5 w-5 text-gray-600" />
                 )}
                 <span className="text-gray-900">{report.reportType}</span>
               </div>
@@ -145,7 +145,7 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
               <label className="block text-sm font-medium text-gray-700 mb-1">Reported By</label>
               <div className="text-gray-900">
                 <p className="font-medium">{report.reportedBy.name}</p>
-                <p className="text-sm text-gray-500">{report.reportedBy.email}</p>
+                <p className="text-sm text-gray-700">{report.reportedBy.email}</p>
               </div>
             </div>
 
@@ -159,7 +159,7 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                       <p className="text-gray-900 mb-2">{report.reportedContent.content}</p>
                     )}
                     {report.reportedContent.authorName && (
-                      <p className="text-sm text-gray-500">Author: {report.reportedContent.authorName}</p>
+                      <p className="text-sm text-gray-700">Author: {report.reportedContent.authorName}</p>
                     )}
                   </div>
                 ) : (
@@ -168,10 +168,10 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                       <p className="text-gray-900 font-medium mb-2">{report.reportedContent.profileName}</p>
                     )}
                     {report.reportedContent.email && (
-                      <p className="text-sm text-gray-500">Email: {report.reportedContent.email}</p>
+                      <p className="text-sm text-gray-700">Email: {report.reportedContent.email}</p>
                     )}
                     {report.reportedContent.phoneNumber && (
-                      <p className="text-sm text-gray-500">Phone: {report.reportedContent.phoneNumber}</p>
+                      <p className="text-sm text-gray-700">Phone: {report.reportedContent.phoneNumber}</p>
                     )}
                     {report.reportedContent.status && (
                       <p className="text-sm text-gray-500 mt-2">
@@ -187,12 +187,12 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
             {report.reviewedBy && (
               <div className="border-t pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Review Information</label>
-                <p className="text-sm text-gray-600">Reviewed by: {report.reviewedBy}</p>
+                <p className="text-sm text-gray-900">Reviewed by: {report.reviewedBy}</p>
                 {report.reviewedAt && (
-                  <p className="text-sm text-gray-600">Reviewed at: {new Date(report.reviewedAt).toLocaleString()}</p>
+                  <p className="text-sm text-gray-900">Reviewed at: {new Date(report.reviewedAt).toLocaleString()}</p>
                 )}
                 {report.reviewNotes && (
-                  <p className="text-sm text-gray-600 mt-2">Notes: {report.reviewNotes}</p>
+                  <p className="text-sm text-gray-900 mt-2">Notes: {report.reviewNotes}</p>
                 )}
               </div>
             )}
@@ -213,11 +213,11 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                 >
                   <div className="flex items-center space-x-2">
                     <CheckCircleIcon className={`h-5 w-5 ${
-                      action === 'validate' ? 'text-green-600' : 'text-gray-400'
+                      action === 'validate' ? 'text-green-600' : 'text-gray-600'
                     }`} />
                     <span className="font-medium text-gray-900">Validate</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Confirm violation</p>
+                  <p className="text-xs text-gray-700 mt-1">Confirm violation</p>
                 </button>
 
                 <button
@@ -230,11 +230,11 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                 >
                   <div className="flex items-center space-x-2">
                     <XCircleIcon className={`h-5 w-5 ${
-                      action === 'dismiss' ? 'text-red-600' : 'text-gray-400'
+                      action === 'dismiss' ? 'text-red-600' : 'text-gray-600'
                     }`} />
                     <span className="font-medium text-gray-900">Dismiss</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Invalid report</p>
+                  <p className="text-xs text-gray-700 mt-1">Invalid report</p>
                 </button>
 
                 <button
@@ -247,11 +247,11 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                 >
                   <div className="flex items-center space-x-2">
                     <ExclamationTriangleIcon className={`h-5 w-5 ${
-                      action === 'escalate' ? 'text-blue-600' : 'text-gray-400'
+                      action === 'escalate' ? 'text-blue-600' : 'text-gray-600'
                     }`} />
                     <span className="font-medium text-gray-900">Escalate</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Needs review</p>
+                  <p className="text-xs text-gray-700 mt-1">Needs review</p>
                 </button>
 
                 <button
@@ -264,11 +264,11 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                 >
                   <div className="flex items-center space-x-2">
                     <ClockIcon className={`h-5 w-5 ${
-                      action === 'review' ? 'text-yellow-600' : 'text-gray-400'
+                      action === 'review' ? 'text-yellow-600' : 'text-gray-600'
                     }`} />
                     <span className="font-medium text-gray-900">Review</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Mark under review</p>
+                  <p className="text-xs text-gray-700 mt-1">Mark under review</p>
                 </button>
               </div>
 
@@ -281,7 +281,7 @@ function ReportDetailsModal({ report, isOpen, onClose, onActionTaken }: ReportDe
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
-                  className="w-full rounded-md border border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm px-3 py-2"
+                  className="w-full rounded-md border border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm px-3 py-2 text-gray-900"
                   placeholder="Add notes about your decision..."
                 />
               </div>
@@ -402,9 +402,9 @@ export default function ReportsPage() {
         {/* Header */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Content Reports</h2>
-          <p className="text-gray-600 mt-1">
-            Review and take action on reported posts and profiles
-          </p>
+              <p className="text-gray-700 mt-1">
+                Review and take action on reported posts and profiles
+              </p>
         </div>
 
         {/* Filters */}
@@ -453,15 +453,15 @@ export default function ReportsPage() {
                 Refresh
               </button>
             </div>
-          </div>
-        </div>
-
+                  </div>
+                </div>
+                
         {/* Reports Table */}
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              <p className="mt-2 text-gray-500">Loading reports...</p>
+              <p className="mt-2 text-gray-900">Loading reports...</p>
             </div>
           ) : error ? (
             <div className="p-8 text-center">
@@ -476,7 +476,7 @@ export default function ReportsPage() {
             </div>
           ) : reports.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-gray-500">No reports found</p>
+              <p className="text-gray-900">No reports found</p>
             </div>
           ) : (
             <>
@@ -510,9 +510,9 @@ export default function ReportsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             {report.reportType === 'POST' ? (
-                              <DocumentTextIcon className="h-5 w-5 text-gray-400 mr-2" />
+                              <DocumentTextIcon className="h-5 w-5 text-gray-600 mr-2" />
                             ) : (
-                              <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
+                              <UserIcon className="h-5 w-5 text-gray-600 mr-2" />
                             )}
                             <span className="text-sm text-gray-900">{report.reportType}</span>
                           </div>
@@ -520,19 +520,19 @@ export default function ReportsPage() {
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{report.reason}</div>
                           {report.description && (
-                            <div className="text-sm text-gray-500 truncate max-w-xs">
+                            <div className="text-sm text-gray-700 truncate max-w-xs">
                               {report.description}
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{report.reportedBy.name}</div>
-                          <div className="text-sm text-gray-500">{report.reportedBy.email}</div>
+                          <div className="text-sm text-gray-700">{report.reportedBy.email}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(report.status)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {new Date(report.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -548,18 +548,18 @@ export default function ReportsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-
+                </div>
+                
               {/* Results Count */}
               <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-gray-900">
                   Showing {reports.length} report{reports.length !== 1 ? 's' : ''}
                 </div>
               </div>
             </>
           )}
         </div>
-      </div>
+                </div>
 
       {/* Report Details Modal */}
       <ReportDetailsModal

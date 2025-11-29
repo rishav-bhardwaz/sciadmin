@@ -8,7 +8,7 @@ export default function ContentPage() {
         {/* Page Header */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Content Moderation</h2>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-700 mt-1">
             Review and moderate all user-generated content across the platform
           </p>
         </div>

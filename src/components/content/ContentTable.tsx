@@ -3,11 +3,8 @@
 import { useState, useEffect } from 'react';
 import {
   EyeIcon,
-  PencilIcon,
-  TrashIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
-  FlagIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import ContentModerationModal from './ContentModerationModal';
@@ -119,40 +116,12 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
           });
           break;
         default:
-          // Get both posts and comments
-          const [postsResponse, commentsResponse] = await Promise.all([
-            contentApi.getPosts({ search: searchTerm || undefined, page, limit: 25 }),
-            contentApi.getComments({ search: searchTerm || undefined, page, limit: 25 })
-          ]);
-
-          const allContent = [
-            ...(postsResponse.data?.posts || []).map((post: any) => ({
-              ...post,
-              type: 'post' as const,
-              datePosted: new Date(post.createdAt),
-              authorId: post.authorId,
-              preview: getContentPreview({ ...post, type: 'post' }),
-              fullContent: post.content,
-            })),
-            ...(commentsResponse.data?.comments || []).map((comment: any) => ({
-              ...comment,
-              type: 'comment' as const,
-              datePosted: new Date(comment.createdAt),
-              authorId: comment.authorId,
-              preview: getContentPreview({ ...comment, type: 'comment' }),
-              fullContent: comment.content,
-              parentPost: comment.post?.title || comment.post?.id,
-            }))
-          ];
-
-          setContent(allContent);
-          setPagination({
+          response = await contentApi.getPosts({
+            search: searchTerm || undefined,
             page,
-            limit: 50,
-            total: allContent.length,
-            pages: Math.ceil(allContent.length / 50)
+            limit: 50
           });
-          return;
+          break;
       }
 
       if (response && response.success && response.data) {
@@ -236,30 +205,30 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
       <div className="p-6">
         {/* Search */}
         <div className="mb-6">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-5 w-5 text-gray-600" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search content by text or author..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-600 text-gray-900 focus:outline-none focus:placeholder-gray-500 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search content by text or author..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
-          </div>
         </div>
 
         {/* Loading/Error States */}
         {loading && (
           <div className="text-center py-12">
-            <div className="text-gray-500">Loading content...</div>
+            <div className="text-gray-900">Loading content...</div>
           </div>
         )}
 
         {error && (
           <div className="text-center py-12">
-            <div className="text-red-500">{error}</div>
+            <div className="text-red-600">{error}</div>
           </div>
         )}
 
@@ -294,13 +263,13 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
                         {getContentPreview(item)}
                       </p>
                       {item.parentPost && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-700 mt-1">
                           Comment on: {item.parentPost}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <div className="flex items-center space-x-4 text-sm text-gray-900">
                       <span>by {getAuthorName(item)}</span>
                       <span>•</span>
                       <span>
@@ -333,38 +302,10 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
                     <button
                       onClick={() => handleModerationAction(item)}
                       className="text-blue-600 hover:text-blue-900 p-1 rounded-md hover:bg-blue-50"
-                      title="View Full Content"
+                      title="View & Moderate Content"
                     >
                       <EyeIcon className="h-4 w-4" />
                     </button>
-
-                    {item.status !== 'removed' && !item.isDeleted && (
-                      <>
-                        <button
-                          onClick={() => handleModerationAction(item)}
-                          className="text-green-600 hover:text-green-900 p-1 rounded-md hover:bg-green-50"
-                          title="Moderate Content"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          onClick={() => handleModerationAction(item)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50"
-                          title="Remove Content"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          onClick={() => handleModerationAction(item)}
-                          className="text-yellow-600 hover:text-yellow-900 p-1 rounded-md hover:bg-yellow-50"
-                          title="Send Warning"
-                        >
-                          <FlagIcon className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
                   </div>
                 </div>
               </div>
@@ -374,7 +315,7 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
 
         {!loading && !error && filteredContent.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-gray-500">
+            <div className="text-gray-900">
               {searchTerm
                 ? 'No content matches your search criteria.'
                 : activeTab === 'reported'
@@ -389,7 +330,7 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
         {!loading && !error && pagination.total > 0 && (
           <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-6">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-900">
                 Showing <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> to{' '}
                 <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
                 <span className="font-medium">{pagination.total}</span> results
@@ -399,14 +340,14 @@ export default function ContentTable({ activeTab }: ContentTableProps) {
               <button
                 onClick={() => setPage(page - 1)}
                 disabled={page <= 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={page >= pagination.pages}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

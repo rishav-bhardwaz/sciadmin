@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import {
   EyeIcon,
-  PencilIcon,
   TrashIcon,
   ExclamationTriangleIcon,
-  FlagIcon,
 } from '@heroicons/react/24/outline';
 
 interface ContentItem {
@@ -40,9 +38,7 @@ interface ContentModerationModalProps {
 
 export default function ContentModerationModal({ content, onConfirm, onCancel }: ContentModerationModalProps) {
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
-  const [editedContent, setEditedContent] = useState(content.fullContent);
   const [reason, setReason] = useState('');
-  const [warningMessage, setWarningMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Helper to get author name from either string or object
@@ -67,15 +63,7 @@ export default function ContentModerationModal({ content, onConfirm, onCancel }:
 
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      if (selectedAction === 'edit') {
-        onConfirm('edit', editedContent);
-      } else if (selectedAction === 'warning') {
-        onConfirm('warning', warningMessage);
-      } else {
-        onConfirm(selectedAction, reason);
-      }
+      onConfirm(selectedAction, reason);
     } finally {
       setIsSubmitting(false);
     }
@@ -84,10 +72,8 @@ export default function ContentModerationModal({ content, onConfirm, onCancel }:
   const getActionTitle = () => {
     switch (selectedAction) {
       case 'view': return 'View Full Content';
-      case 'edit': return 'Edit Content';
       case 'remove': return 'Remove Content';
       case 'delete': return 'Delete Content Permanently';
-      case 'warning': return 'Send Warning to Author';
       default: return 'Content Moderation';
     }
   };
@@ -129,19 +115,9 @@ export default function ContentModerationModal({ content, onConfirm, onCancel }:
                 )}
                 
                 <div className="text-sm text-gray-900">
-                  {selectedAction === 'edit' ? (
-                    <textarea
-                      value={editedContent}
-                      onChange={(e) => setEditedContent(e.target.value)}
-                      rows={6}
-                      className="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-3"
-                      placeholder="Edit content..."
-                    />
-                  ) : (
-                    <div className="bg-white rounded-md p-4 border border-gray-200">
-                      <p className="whitespace-pre-wrap text-gray-900">{content.fullContent || 'No content available'}</p>
-                    </div>
-                  )}
+                  <div className="bg-white rounded-md p-4 border border-gray-200">
+                    <p className="whitespace-pre-wrap text-gray-900">{content.fullContent || 'No content available'}</p>
+                  </div>
                 </div>
                 
                 {content.reportReasons && content.reportReasons.length > 0 && (
@@ -169,74 +145,42 @@ export default function ContentModerationModal({ content, onConfirm, onCancel }:
                   </button>
                   
                   <button
-                    onClick={() => setSelectedAction('edit')}
-                    className="flex flex-col items-center justify-center p-4 border-2 border-green-300 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all duration-200 bg-white"
-                  >
-                    <PencilIcon className="h-6 w-6 text-green-600 mb-2" />
-                    <span className="text-sm font-semibold text-gray-900">Edit Content</span>
-                  </button>
-                  
-                  <button
                     onClick={() => setSelectedAction('remove')}
                     className="flex flex-col items-center justify-center p-4 border-2 border-orange-300 rounded-lg hover:bg-orange-50 hover:border-orange-400 transition-all duration-200 bg-white"
                   >
                     <TrashIcon className="h-6 w-6 text-orange-600 mb-2" />
-                    <span className="text-sm font-semibold text-gray-900">Soft Delete</span>
+                    <span className="text-sm font-semibold text-gray-900">Remove Content</span>
                   </button>
                   
                   <button
                     onClick={() => setSelectedAction('delete')}
-                    className="flex flex-col items-center justify-center p-4 border-2 border-red-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all duration-200 bg-white"
+                    className="flex flex-col items-center justify-center p-4 border-2 border-red-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-all duration-200 bg-white col-span-2"
                   >
                     <ExclamationTriangleIcon className="h-6 w-6 text-red-600 mb-2" />
                     <span className="text-sm font-semibold text-gray-900">Delete Permanently</span>
                   </button>
-                  
-                  <button
-                    onClick={() => setSelectedAction('warning')}
-                    className="flex flex-col items-center justify-center p-4 border-2 border-yellow-300 rounded-lg hover:bg-yellow-50 hover:border-yellow-400 transition-all duration-200 bg-white col-span-2"
-                  >
-                    <FlagIcon className="h-6 w-6 text-yellow-600 mb-2" />
-                    <span className="text-sm font-semibold text-gray-900">Send Warning to Author</span>
-                  </button>
                 </div>
               )}
 
-              {selectedAction && selectedAction !== 'view' && selectedAction !== 'edit' && (
+              {selectedAction && selectedAction !== 'view' && (
                 <div className="space-y-4 mb-6">
-                  {selectedAction === 'warning' ? (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Warning Message
-                      </label>
-                      <textarea
-                        value={warningMessage}
-                        onChange={(e) => setWarningMessage(e.target.value)}
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-3"
-                        placeholder="Enter a warning message to send to the content author..."
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Reason for {selectedAction === 'remove' ? 'removing' : 'deleting'} this content
-                      </label>
-                      <textarea
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        rows={3}
-                        className="w-full border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-3"
-                        placeholder="Provide a reason for this moderation action..."
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Reason for {selectedAction === 'remove' ? 'removing' : 'deleting'} this content
+                    </label>
+                    <textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-3 text-gray-900"
+                      placeholder="Provide a reason for this moderation action..."
+                    />
+                  </div>
                   
                   <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-md p-4">
                     <p className="text-sm text-yellow-800">
                       {selectedAction === 'remove' && 'This will remove the content from public view but keep it in the admin panel for records.'}
                       {selectedAction === 'delete' && 'This will permanently delete the content from the database. This action cannot be undone.'}
-                      {selectedAction === 'warning' && 'This will send a direct message to the content author about their post.'}
                     </p>
                   </div>
                 </div>
@@ -248,8 +192,6 @@ export default function ContentModerationModal({ content, onConfirm, onCancel }:
                     onClick={() => {
                       setSelectedAction(null);
                       setReason('');
-                      setWarningMessage('');
-                      setEditedContent(content.fullContent);
                     }}
                     className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all"
                   >
@@ -268,21 +210,15 @@ export default function ContentModerationModal({ content, onConfirm, onCancel }:
                   <button
                     onClick={handleSubmit}
                     disabled={
-                      isSubmitting || 
-                      (selectedAction === 'warning' && !warningMessage.trim()) ||
-                      (selectedAction !== 'warning' && selectedAction !== 'edit' && !reason.trim())
+                      isSubmitting || !reason.trim()
                     }
                     className={`px-5 py-2.5 text-sm font-semibold text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all ${
-                      selectedAction === 'edit' 
-                        ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
-                        : selectedAction === 'warning'
-                        ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500'
-                        : selectedAction === 'remove'
+                      selectedAction === 'remove'
                         ? 'bg-orange-600 hover:bg-orange-700 focus:ring-orange-500'
                         : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
                     } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-current`}
                   >
-                    {isSubmitting ? 'Processing...' : `Confirm ${selectedAction === 'edit' ? 'Edit' : selectedAction === 'warning' ? 'Send Warning' : selectedAction === 'remove' ? 'Remove' : 'Delete'}`}
+                    {isSubmitting ? 'Processing...' : `Confirm ${selectedAction === 'remove' ? 'Remove' : 'Delete'}`}
                   </button>
                 )}
               </div>
