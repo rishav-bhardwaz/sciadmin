@@ -1,243 +1,318 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { use } from "react"; // new hook to unwrap promises
+import { use } from "react";
+import { eventsApi, ApiError } from "@/lib/api";
+import { toast } from "react-hot-toast";
+
+interface EventData {
+  id: string;
+  title: string;
+  description?: string;
+  startDateTime?: string;
+  endDateTime?: string;
+  meetLink?: string;
+  featuredImage?: string;
+  isFree?: boolean;
+  price?: number;
+  maxAttendees?: number;
+  category?: string;
+  speakers?: Array<{
+    name: string;
+    title: string;
+    company?: string;
+    bio?: string;
+    profileImage?: string;
+    socialLinks?: {
+      linkedin?: string;
+      twitter?: string;
+      website?: string;
+    };
+  }>;
+  agenda?: Array<{
+    title: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
+    speakerName?: string;
+    sessionType?: string;
+  }>;
+}
 
 export default function EventPage({
   params,
 }: {
-  params: Promise<{ eventId: string }>; // params is now a Promise
+  params: Promise<{ eventId: string }>;
 }) {
   const router = useRouter();
-
-  // Unwrap the params promise
   const resolvedParams = use(params);
   const { eventId } = resolvedParams;
 
-  console.log("Event ID:", eventId);
+  const [event, setEvent] = useState<EventData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const event = {
-    title: "Tech Conference 2024",
-    description:
-      "Join us for an exciting tech conference featuring top experts in AI, cloud computing, cybersecurity, and innovation. Gain insights, hands-on experience, and network with professionals shaping the future of technology.",
-    startDate: "20-12-2024 09:00 AM",
-    endDate: "20-12-2024 05:00 PM",
-    venueType: "Hybrid (Online + In-Person)",
-    venueLocation: "TechPark Auditorium, Bengaluru, India",
-    featuredImage:
-      "https://imgs.search.brave.com/dG2Ov7Z4dgrAwWt3ZDiUWt9wMUxZrUSw8Wf_ZEaRqN4/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YS5nZXR0eWltYWdl/cy5jb20vaWQvMTQ4/MzQ4NzA0Mi9waG90/by9wb3J0cmFpdC1v/Zi1hLWZlbWFsZS1h/dmF0YXItbWFkZS1m/b3Itd2ViMy1hbmQt/dGhlLW1ldGF2ZXJz/ZS5qcGc_cz02MTJ4/NjEyJnc9MCZrPTIw/JmM9UEN0a3lEb1FI/WjNXWl96em9rckIw/N0YzblMxRWpWQ2hL/RHE2SWxYcUF6bz0",
-    isFree: false,
-    ticketPrice: "₹1,499",
-    capacity: 250,
-    registrationFields: [
-      { fieldName: "Full Name", placeholder: "Enter your full name" },
-      { fieldName: "Email", placeholder: "Enter your email address" },
-      { fieldName: "Phone Number", placeholder: "Enter your contact number" },
-      { fieldName: "Organization", placeholder: "Your company or institution" },
-    ],
-    speakers: [
-      {
-        name: "Dr. Jane Smith",
-        title: "AI Research Director",
-        company: "TechCorp",
-        profileImg:
-          "https://imgs.search.brave.com/GAMU3dRtcBIISUDbnMKfpkmQ5pUBBPEOEIz9vKrHc0w/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE1LzQwLzM2LzI3/LzM2MF9GXzE1NDAz/NjI3ODhfN2h4QWt1/Y0dEbkg1TE9RRzhH/RU03REtSY09MY0lW/T1EuanBn",
-        social: {
-          linkedin: "https://linkedin.com/",
-          twitter: "https://twitter.com/",
-          website: "https://techcorp.com",
-        },
-      },
-      {
-        name: "Arjun Mehta",
-        title: "Cloud Architect",
-        company: "Google Cloud India",
-        profileImg:
-          "https://imgs.search.brave.com/GAMU3dRtcBIISUDbnMKfpkmQ5pUBBPEOEIz9vKrHc0w/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE1LzQwLzM2LzI3/LzM2MF9GXzE1NDAz/NjI3ODhfN2h4QWt1/Y0dEbkg1TE9RRzhH/RU03REtSY09MY0lW/T1EuanBn",
-        social: {
-          linkedin: "https://linkedin.com/in/arjunmehta",
-          twitter: "https://twitter.com/arjunmehta",
-          website: "https://cloud.google.com",
-        },
-      },
-      {
-        name: "Sara Johnson",
-        title: "Cybersecurity Analyst",
-        company: "SecureNet",
-        profileImg:
-          "https://imgs.search.brave.com/GAMU3dRtcBIISUDbnMKfpkmQ5pUBBPEOEIz9vKrHc0w/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzE1LzQwLzM2LzI3/LzM2MF9GXzE1NDAz/NjI3ODhfN2h4QWt1/Y0dEbkg1TE9RRzhH/RU03REtSY09MY0lW/T1EuanBn",
-        social: {
-          linkedin: "https://linkedin.com/in/sarajohnson",
-          twitter: "https://twitter.com/sarajohnson",
-          website: "https://securenet.com",
-        },
-      },
-    ],
-    agenda: [
-      {
-        title: "Opening Keynote: The Future of AI",
-        startTime: "20-12-2024 09:30 AM",
-        endTime: "20-12-2024 11:00 AM",
-        speaker: "Dr. Jane Smith",
-        type: "Keynote",
-        description:
-          "An inspiring session exploring the evolution of artificial intelligence and how it is reshaping industries globally.",
-      },
-      {
-        title: "Hands-On Cloud Workshop",
-        startTime: "20-12-2024 11:30 AM",
-        endTime: "20-12-2024 01:00 PM",
-        speaker: "Arjun Mehta",
-        type: "Workshop",
-        description:
-          "Learn how to deploy scalable cloud infrastructure on Google Cloud with practical demonstrations.",
-      },
-      {
-        title: "Cybersecurity in 2024: Trends and Challenges",
-        startTime: "20-12-2024 02:00 PM",
-        endTime: "20-12-2024 03:30 PM",
-        speaker: "Sara Johnson",
-        type: "Panel Discussion",
-        description:
-          "A discussion on emerging cybersecurity threats, zero trust frameworks, and data protection best practices.",
-      },
-      {
-        title: "AI + Cloud: The Next Frontier",
-        startTime: "20-12-2024 03:45 PM",
-        endTime: "20-12-2024 05:00 PM",
-        speaker: "All Speakers",
-        type: "Roundtable",
-        description:
-          "An engaging roundtable on how artificial intelligence and cloud computing together will shape the next decade.",
-      },
-    ],
-    organizer: {
-      name: "Global Tech Community",
-      contactEmail: "contact@globaltechconf.com",
-      website: "https://globaltechconf.com",
-    },
-    sponsors: [
-      {
-        name: "TechCorp",
-        logo: "https://logos-world.net/wp-content/uploads/2020/09/Google-Logo.png",
-      },
-      {
-        name: "SecureNet",
-        logo: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
-      },
-      {
-        name: "CloudWorks",
-        logo: "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg",
-      },
-    ],
-    tags: ["AI", "Cloud", "Cybersecurity", "Innovation", "Networking"],
+  useEffect(() => {
+    const fetchEvent = async () => {
+      if (!eventId) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await eventsApi.getEventById(eventId);
+        const evt = response.data || response;
+        setEvent(evt);
+      } catch (err: any) {
+        console.error("Error fetching event:", err);
+        const errorMessage = err instanceof ApiError ? err.message : "Failed to load event";
+        setError(errorMessage);
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvent();
+  }, [eventId]);
+
+  const formatDateTime = (dateTimeString?: string) => {
+    if (!dateTimeString) return "Not specified";
+    try {
+      const date = new Date(dateTimeString);
+      return date.toLocaleString("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch {
+      return dateTimeString;
+    }
   };
 
+  const formatTime = (timeString?: string) => {
+    if (!timeString) return "Not specified";
+    try {
+      const date = new Date(timeString);
+      return date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch {
+      return timeString;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white text-gray-900 px-4 md:px-10 py-10 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
+          <p className="text-gray-900">Loading event details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <div className="min-h-screen bg-white text-gray-900 px-4 md:px-10 py-10">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex justify-center rounded-md border border-transparent bg-black py-2 px-5 mb-10 text-sm font-medium text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2"
+        >
+          ← Back
+        </button>
+        <div className="text-center py-12">
+          <p className="text-red-600 text-lg mb-4">{error || "Event not found"}</p>
+          <button
+            onClick={() => router.push("/events")}
+            className="inline-flex justify-center rounded-md border border-transparent bg-black py-2 px-5 text-sm font-medium text-white shadow-sm hover:bg-gray-900"
+          >
+            Go to Events
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+
   return (
-    <div className="min-h-screen bg-white text-gray-900 px-50 py-10 ">
+    <div className="min-h-screen bg-white text-gray-900 px-4 md:px-10 py-10">
       {/* Back Button */}
       <button
         onClick={() => router.back()}
-        className="inline-flex justify-center rounded-md border border-transparent bg-black py-2 px-5 mb-10 text-sm font-medium text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 disabled:opacity-50"
+        className="inline-flex justify-center rounded-md border border-transparent bg-black py-2 px-5 mb-10 text-sm font-medium text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2"
       >
         ← Back
       </button>
 
       {/* Event Header */}
-      <section className="mb-10 ">
-        <h1 className="text-4xl font-bold">{event.title}</h1>
-        <p className="text-gray-600 mt-3 text-lg">{event.description}</p>
+      <section className="mb-10">
+        <h1 className="text-4xl font-bold text-gray-900">{event.title || "Untitled Event"}</h1>
+        {event.description && (
+          <p className="text-gray-700 mt-3 text-lg">{event.description}</p>
+        )}
       </section>
 
       {/* Event Image */}
-      <div className="relative w-full h-64 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-        <Image
-          src={event.featuredImage}
-          alt="Event Banner"
-          fill
-          className="object-cover"
-          quality={75}
-        />
-      </div>
+      {event.featuredImage && (
+        <div className="relative w-full h-64 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+          <Image
+            src={event.featuredImage}
+            alt="Event Banner"
+            fill
+            className="object-cover"
+            quality={75}
+          />
+        </div>
+      )}
 
       {/* Basic Info */}
       <section className="grid md:grid-cols-2 gap-6 bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-10 shadow-sm">
         <div>
-          <h3 className="font-semibold text-gray-700">Start Date & Time</h3>
-          <p className="text-gray-600">{event.startDate}</p>
+          <h3 className="font-semibold text-gray-900">Start Date & Time</h3>
+          <p className="text-gray-700">{formatDateTime(event.startDateTime)}</p>
         </div>
         <div>
-          <h3 className="font-semibold text-gray-700">End Date & Time</h3>
-          <p className="text-gray-600">{event.endDate}</p>
+          <h3 className="font-semibold text-gray-900">End Date & Time</h3>
+          <p className="text-gray-700">{formatDateTime(event.endDateTime)}</p>
         </div>
         <div>
-          <h3 className="font-semibold text-gray-700">Venue Type</h3>
-          <p className="text-gray-600">{event.venueType}</p>
+          <h3 className="font-semibold text-gray-900">Venue Type</h3>
+          <p className="text-gray-700">Online</p>
         </div>
+        {event.meetLink && (
+          <div>
+            <h3 className="font-semibold text-gray-900">Meeting Link</h3>
+            <a
+              href={event.meetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              {event.meetLink}
+            </a>
+          </div>
+        )}
+        {event.maxAttendees && (
+          <div>
+            <h3 className="font-semibold text-gray-900">Capacity</h3>
+            <p className="text-gray-700">{event.maxAttendees} attendees</p>
+          </div>
+        )}
         <div>
-          <h3 className="font-semibold text-gray-700">Capacity</h3>
-          <p className="text-gray-600">{event.capacity}</p>
+          <h3 className="font-semibold text-gray-900">Price</h3>
+          <p className="text-gray-700">
+            {event.isFree ? "Free" : event.price ? `₹${event.price}` : "Not specified"}
+          </p>
         </div>
-      </section>
-
-      {/* Registration Fields */}
-      <section className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-10 shadow-sm">
-        <h2 className="text-2xl font-semibold mb-4">Registration Form</h2>
-        <ul className="list-disc ml-6 text-gray-600 space-y-2">
-          {event.registrationFields.map((field, i) => (
-            <li key={i}>
-              <strong>{field.fieldName}</strong> – <i>{field.placeholder}</i>
-            </li>
-          ))}
-        </ul>
+        {event.category && (
+          <div>
+            <h3 className="font-semibold text-gray-900">Category</h3>
+            <p className="text-gray-700">{event.category}</p>
+          </div>
+        )}
       </section>
 
       {/* Speakers */}
-      <section className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-10 shadow-sm">
-        <h2 className="text-2xl font-semibold mb-4">Speakers</h2>
-        {event.speakers.map((sp, i) => (
-          <div
-            key={i}
-            className="flex flex-col md:flex-row gap-6 border-b border-gray-200 pb-6 mb-6 last:border-0 last:pb-0 last:mb-0"
-          >
-            <div className="w-32 h-32 relative rounded-lg overflow-hidden shadow-sm border border-gray-200">
-              <Image src={sp.profileImg} alt={sp.name} fill className="object-cover" />
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold">{sp.name}</h3>
-              <p className="text-gray-600">
-                {sp.title} – {sp.company}
-              </p>
-              <div className="flex gap-4 mt-3 text-blue-600">
-                <a href={sp.social.linkedin}>LinkedIn</a>
-                <a href={sp.social.twitter}>Twitter</a>
-                <a href={sp.social.website}>Website</a>
+      {event.speakers && event.speakers.length > 0 && (
+        <section className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-10 shadow-sm">
+          <h2 className="text-2xl font-semibold mb-4 text-gray-900">Speakers</h2>
+          {event.speakers.map((speaker, i) => (
+            <div
+              key={i}
+              className="flex flex-col md:flex-row gap-6 border-b border-gray-200 pb-6 mb-6 last:border-0 last:pb-0 last:mb-0"
+            >
+              {speaker.profileImage && (
+                <div className="w-32 h-32 relative rounded-lg overflow-hidden shadow-sm border border-gray-200 flex-shrink-0">
+                  <Image
+                    src={speaker.profileImage}
+                    alt={speaker.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              )}
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">{speaker.name}</h3>
+                <p className="text-gray-700">
+                  {speaker.title}
+                  {speaker.company && ` – ${speaker.company}`}
+                </p>
+                {speaker.bio && (
+                  <p className="text-gray-600 mt-2">{speaker.bio}</p>
+                )}
+                {speaker.socialLinks && (
+                  <div className="flex gap-4 mt-3">
+                    {speaker.socialLinks.linkedin && (
+                      <a
+                        href={speaker.socialLinks.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        LinkedIn
+                      </a>
+                    )}
+                    {speaker.socialLinks.twitter && (
+                      <a
+                        href={speaker.socialLinks.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        Twitter
+                      </a>
+                    )}
+                    {speaker.socialLinks.website && (
+                      <a
+                        href={speaker.socialLinks.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        Website
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
+      )}
 
       {/* Agenda */}
-      <section className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-10 shadow-sm">
-        <h2 className="text-2xl font-semibold mb-4">Agenda</h2>
-        {event.agenda.map((ag, i) => (
-          <div
-            key={i}
-            className="border-b border-gray-200 pb-4 mb-4 last:border-0 last:pb-0 last:mb-0"
-          >
-            <h3 className="text-lg font-semibold">{ag.title}</h3>
-            <p className="text-gray-600">
-              {ag.startTime} - {ag.endTime}
-            </p>
-            <p className="mt-1 text-gray-600">
-              Speaker: <b>{ag.speaker}</b> | Type: {ag.type}
-            </p>
-            <p className="mt-2 text-gray-600">{ag.description}</p>
-          </div>
-        ))}
-      </section>
+      {event.agenda && event.agenda.length > 0 && (
+        <section className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mt-10 shadow-sm">
+          <h2 className="text-2xl font-semibold mb-4 text-gray-900">Agenda</h2>
+          {event.agenda.map((item, i) => (
+            <div
+              key={i}
+              className="border-b border-gray-200 pb-4 mb-4 last:border-0 last:pb-0 last:mb-0"
+            >
+              <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
+              <p className="text-gray-700">
+                {formatTime(item.startTime)} - {formatTime(item.endTime)}
+              </p>
+              {item.speakerName && (
+                <p className="mt-1 text-gray-700">
+                  Speaker: <b>{item.speakerName}</b>
+                  {item.sessionType && ` | Type: ${item.sessionType}`}
+                </p>
+              )}
+              {item.description && (
+                <p className="mt-2 text-gray-700">{item.description}</p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

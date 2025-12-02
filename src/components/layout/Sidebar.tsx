@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   HomeIcon,
   CalendarIcon,
-  // UsersIcon,
+  UsersIcon,
   DocumentTextIcon,
   // CogIcon,
   ChevronLeftIcon,
@@ -26,15 +26,15 @@ const navigation = [
       { name: 'Create New', href: '/events/create' },
     ],
   },
-  // {
-  //   name: 'Users',
-  //   href: '/users',
-  //   icon: UsersIcon,
-  //   children: [
-  //     { name: 'User List', href: '/users' },
-  //     { name: 'Blacklist Log', href: '/users/blacklist' },
-  //   ],
-  // },
+  {
+    name: 'Users',
+    href: '/users',
+    icon: UsersIcon,
+    children: [
+      { name: 'User List', href: '/users' },
+      { name: 'Blacklist Log', href: '/users/blacklist' },
+    ],
+  },
   {
     name: 'Content',
     href: '/content',

@@ -228,7 +228,9 @@ export const authApi = {
 };
 
 // Users API
-// Note: Using same base URL as other APIs, but users endpoint might need different path
+// Postman shows: {{admin_url}}/admin/users where {{admin_url}} = http://localhost:3005 (direct admin service)
+// Through gateway: https://xcience.in/admin/admin + /admin/users = https://xcience.in/admin/admin/admin/users
+// The gateway routes /admin/admin/admin/users to the admin service's /admin/users endpoint
 export const usersApi = {
   getUsers: async (params?: {
     status?: string;
@@ -242,9 +244,7 @@ export const usersApi = {
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
 
-    // Try /admin/users first - if this doesn't work, the endpoint might not exist
-    // or the base URL structure might be different for users
-    return apiClient(`/admin/users?${searchParams.toString()}`);
+    return apiClient(`/users?${searchParams.toString()}`);
   },
 
   getUserById: async (userId: string): Promise<ApiResponse<any>> => {
