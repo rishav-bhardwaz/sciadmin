@@ -87,17 +87,19 @@ export default function UsersTable() {
       });
 
       if (response.success && response.data) {
+        console.log(response.data);
         const usersData = response.data.users || response.data || [];
+        console.log(usersData)
         const mappedUsers: User[] = usersData.map((user: any) => ({
           id: user.id || user._id,
           profilePicture: user.profilePicture || user.profileImage,
-          fullName: user.fullName || user.name || user.profileName || 'Unknown',
+          fullName: user.fullName || user.name || user.profileName || user.profile?.name || 'Unknown',
           email: user.email || '',
           joinDate: user.joinDate ? new Date(user.joinDate) : new Date(),
           status: user.status === 'BLACKLISTED' || user.status === 'blacklisted' ? 'blacklisted' : 'active',
           role: user.role || 'student',
-          postsCount: user.postsCount || 0,
-          eventsAttended: user.eventsAttended || 0,
+          postsCount: user.postsCount || user.stats.totalPosts || 0,
+          eventsAttended: user.eventsAttended || user.profile?.eventRegistrations || 0,
         }));
 
         setUsers(mappedUsers);
