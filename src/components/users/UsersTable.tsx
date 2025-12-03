@@ -95,7 +95,7 @@ export default function UsersTable() {
           profilePicture: user.profilePicture || user.profileImage,
           fullName: user.fullName || user.name || user.profileName || user.profile?.name || 'Unknown',
           email: user.email || '',
-          joinDate: user.joinDate ? new Date(user.joinDate) : new Date(),
+          joinDate: user?.createdAt ? new Date(user.createdAt) : new Date(),
           status: user.status === 'BLACKLISTED' || user.status === 'blacklisted' ? 'blacklisted' : 'active',
           role: user.role || 'student',
           postsCount: user.postsCount || user.stats.totalPosts || 0,
