@@ -5,8 +5,8 @@
 // const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'http://13.203.50.228/admin/admin';
 // const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'http://localhost:8080/admin/admin';
 // const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'http://localhost:8080/admin/admin';
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://xcience.in/admin/admin';
-const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'https://xcience.in/admin/admin';
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://xcience.in/admin';
+const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'https://xcience.in/admin';
 // const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://bitter-things-tap.loca.lt/admin/admin';
 // const EVENTS_API_BASE_URL = process.env.NEXT_PUBLIC_EVENTS_API_URL || 'https://bitter-things-tap.loca.lt/admin/admin';
 const API_BASE_URL = AUTH_API_BASE_URL; // Default for backward compatibility
@@ -248,38 +248,38 @@ export const usersApi = {
   },
 
   getUserById: async (userId: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/admin/users/${userId}`);
+    return apiClient(`/users/${userId}`);
   },
 
   updateUserStatus: async (userId: string, status: string, reason?: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/admin/users/${userId}/status`, {
+    return apiClient(`/users/${userId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status, reason }),
     });
   },
 
   blacklistUser: async (userId: string, reason?: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/admin/users/${userId}/blacklist`, {
+    return apiClient(`/users/${userId}/blacklist`, {
       method: 'PUT',
       body: JSON.stringify({ reason }),
     });
   },
 
   unblacklistUser: async (userId: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/admin/users/${userId}/unblacklist`, {
+    return apiClient(`/users/${userId}/unblacklist`, {
       method: 'PUT',
     });
   },
 
   deleteUser: async (userId: string, reason?: string): Promise<ApiResponse<any>> => {
-    return apiClient(`/admin/users/${userId}`, {
+    return apiClient(`/users/${userId}`, {
       method: 'DELETE',
       body: JSON.stringify({ reason }),
     });
   },
 
   getUserStats: async (): Promise<ApiResponse<any>> => {
-    return apiClient('/admin/users/stats');
+    return apiClient('/users/stats');
   },
 };
 
