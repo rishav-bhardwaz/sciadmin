@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { use } from "react";
 import { eventsApi, ApiError } from "@/lib/api";
 import { toast } from "react-hot-toast";
+import EventRegistrationsList, {
+  EventRegistration,
+} from "@/components/events/EventRegistrationsList";
+import RegistrationDetailsDrawer from "@/components/events/RegistrationDetailsDrawer";
 
 interface EventData {
   id: string;
@@ -38,6 +42,12 @@ interface EventData {
     speakerName?: string;
     sessionType?: string;
   }>;
+  registrations?: EventRegistration[];
+  registrationCount?: number;
+  activeRegistrations?: number;
+  venueType?: string;
+  location?: string | null;
+  venueAddress?: string | null;
 }
 
 export default function EventPage({
@@ -52,6 +62,9 @@ export default function EventPage({
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(
+    null
+  );
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -63,7 +76,7 @@ export default function EventPage({
         const response = await eventsApi.getEventById(eventId);
         const evt = response.data || response;
         setEvent(evt);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching event:", err);
         const errorMessage = err instanceof ApiError ? err.message : "Failed to load event";
         setError(errorMessage);
@@ -184,8 +197,14 @@ export default function EventPage({
         </div>
         <div>
           <h3 className="font-semibold text-gray-900">Venue Type</h3>
-          <p className="text-gray-700">Online</p>
+          <p className="text-gray-700">{event.venueType || "Not specified"}</p>
         </div>
+        {(event.location || event.venueAddress) && (
+          <div>
+            <h3 className="font-semibold text-gray-900">Venue Details</h3>
+            <p className="text-gray-700">{event.location || event.venueAddress}</p>
+          </div>
+        )}
         {event.meetLink && (
           <div>
             <h3 className="font-semibold text-gray-900">Meeting Link</h3>
@@ -313,6 +332,18 @@ export default function EventPage({
           ))}
         </section>
       )}
+
+      {/* Registered Users */}
+      <EventRegistrationsList
+        registrations={event.registrations || []}
+        selectedRegistrationId={selectedRegistration?.id}
+        onSelectRegistration={setSelectedRegistration}
+      />
+
+      <RegistrationDetailsDrawer
+        registration={selectedRegistration}
+        onClose={() => setSelectedRegistration(null)}
+      />
     </div>
   );
 }
