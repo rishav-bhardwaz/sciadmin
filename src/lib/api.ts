@@ -373,6 +373,13 @@ export const eventsApi = {
     });
   },
 
+  updateEventStep1: async (eventId: string, data: any): Promise<ApiResponse<any>> => {
+    return eventsApiClient(`/events/${eventId}/step1`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   updateEventStep2: async (eventId: string, data: any): Promise<ApiResponse<any>> => {
     return eventsApiClient(`/events/${eventId}/step2`, {
       method: 'PUT',

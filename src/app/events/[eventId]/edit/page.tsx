@@ -98,9 +98,13 @@ const step1Schema = z.object({
   meetLink: z.string().min(1, 'Meet link is required'),
   startDateTime: z.string().min(1, 'Start date is required'),
   endDateTime: z.string().min(1, 'End date is required'),
+  venueType: z.enum(['ONLINE', 'PHYSICAL', 'HYBRID']).optional(),
+  location: z.string().optional(),
+  venueAddress: z.string().optional(),
 });
 
 const step2Schema = z.object({
+  category: z.enum(['FEATURED', 'OTHERS']),
   featuredImage: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   maxAttendees: z.number().min(1, 'Must have at least 1 attendee'),
   price: z.number().min(0, 'Price cannot be negative').optional(),
@@ -112,6 +116,22 @@ const step3Schema = z.object({
   speakers: z.array(speakerSchema),
   agenda: z.array(agendaItemSchema),
 });
+
+function normalizeSpeakerSocialLinks(links?: {
+  linkedin?: string;
+  twitter?: string;
+  website?: string;
+}): Partial<{ linkedin: string; twitter: string; website: string }> | undefined {
+  if (!links) return undefined;
+  const linkedin = (links.linkedin ?? '').trim();
+  const twitter = (links.twitter ?? '').trim();
+  const website = (links.website ?? '').trim();
+  const out: Partial<{ linkedin: string; twitter: string; website: string }> = {};
+  if (linkedin) out.linkedin = linkedin;
+  if (twitter) out.twitter = twitter;
+  if (website) out.website = website;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 type Step1Data = z.infer<typeof step1Schema>;
 type Step2Data = z.infer<typeof step2Schema>;
@@ -126,7 +146,8 @@ const tabs = [
 
 
 /* ---------------------------
-   Helper: Parse "20-12-2024 09:00 AM" -> "2024-12-20T09:00"
+   Helpers: API / ISO datetimes -> value for <input type="datetime-local" />
+   GET /events/:id returns ISO like 2026-04-11T16:00:00 — not dd-mm-yyyy.
    --------------------------- */
 function parseCustomDateToDatetimeLocal(input: string): string {
   try {
@@ -154,6 +175,25 @@ function parseCustomDateToDatetimeLocal(input: string): string {
   }
 }
 
+function eventDateTimeToDatetimeLocal(input: string | null | undefined): string {
+  if (input == null || input === '') return '';
+  const s = String(input).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+  if (iso) {
+    return `${iso[1]}-${iso[2]}-${iso[3]}T${iso[4]}:${iso[5]}`;
+  }
+  return parseCustomDateToDatetimeLocal(s);
+}
+
+function unwrapEventFromApiResponse(res: any): Record<string, any> {
+  if (res && typeof res === 'object' && typeof res.id === 'string') return res;
+  const inner = res?.data;
+  if (inner && typeof inner === 'object' && typeof inner.id === 'string') return inner;
+  const ev = res?.data?.event;
+  if (ev && typeof ev === 'object' && typeof ev.id === 'string') return ev;
+  return res && typeof res === 'object' ? res : {};
+}
+
 /* ---------------------------
    Edit Page Component
    --------------------------- */
@@ -176,6 +216,9 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
       meetLink: '',
       startDateTime: '',
       endDateTime: '',
+      venueType: 'ONLINE' as const,
+      location: '',
+      venueAddress: '',
     },
   });
 
@@ -183,6 +226,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
     mode: 'onChange',
     resolver: zodResolver(step2Schema),
     defaultValues: {
+      category: 'OTHERS',
       featuredImage: '',
       maxAttendees: 100,
       price: 0,
@@ -254,34 +298,37 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
       try {
         setLoading(true);
         const response = await eventsApi.getEventById(eventId);
-        const evt = response.data || response;
+        const evt = unwrapEventFromApiResponse(response);
 
         // Step 1 mapping
         step1Form.reset({
           title: evt.title || '',
-          description: evt.description || '',
+          description: evt.description ?? '',
           meetLink: evt.meetLink || '',
-          startDateTime: evt.startDateTime ? parseCustomDateToDatetimeLocal(evt.startDateTime) : '',
-          endDateTime: evt.endDateTime ? parseCustomDateToDatetimeLocal(evt.endDateTime) : '',
+          startDateTime: evt.startDateTime ? eventDateTimeToDatetimeLocal(evt.startDateTime) : '',
+          endDateTime: evt.endDateTime ? eventDateTimeToDatetimeLocal(evt.endDateTime) : '',
+          venueType: (evt.venueType as 'ONLINE' | 'PHYSICAL' | 'HYBRID') || 'ONLINE',
+          location: evt.location ?? '',
+          venueAddress: evt.venueAddress ?? '',
         });
 
-        // Step 2 mapping
+        // Step 2 mapping (category must match backend EventCategory: FEATURED | OTHERS)
         step2Form.reset({
-          category: evt.category || '',
-          featuredImage: evt.featuredImage || '',
-          maxAttendees: evt.maxAttendees || 100,
-          price: evt.price || 0,
+          category: evt.category === 'FEATURED' ? 'FEATURED' : 'OTHERS',
+          featuredImage: evt.featuredImage ?? '',
+          maxAttendees: evt.maxAttendees ?? 100,
+          price: evt.price ?? 0,
           isFree: evt.isFree !== undefined ? evt.isFree : true,
-          registrationFields: [],
+          registrationFields: Array.isArray(evt.registrationFields) ? evt.registrationFields : [],
         });
 
         // Step 3 mapping
         const speakersMapped = (evt.speakers || []).map((s: any, index: number) => ({
           name: s.name || '',
           title: s.title || '',
-          company: s.company || '',
-          bio: s.bio || '',
-          profileImage: s.profileImage || s.profileImg || '',
+          company: s.company ?? '',
+          bio: s.bio ?? '',
+          profileImage: s.profileImage || s.photoUrl || s.profileImg || '',
           order: s.order !== undefined ? s.order : index,
           socialLinks: {
             linkedin: s.socialLinks?.linkedin || s.social?.linkedin || '',
@@ -292,9 +339,9 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
 
         const agendaMapped = (evt.agenda || []).map((a: any, index: number) => ({
           title: a.title || '',
-          description: a.description || '',
-          startTime: a.startTime ? parseCustomDateToDatetimeLocal(a.startTime) : '',
-          endTime: a.endTime ? parseCustomDateToDatetimeLocal(a.endTime) : '',
+          description: a.description ?? '',
+          startTime: a.startTime ? eventDateTimeToDatetimeLocal(a.startTime) : '',
+          endTime: a.endTime ? eventDateTimeToDatetimeLocal(a.endTime) : '',
           speakerName: a.speakerName || a.speaker || '',
           sessionType: (a.sessionType || a.type || 'WORKSHOP') as SessionType,
           order: a.order !== undefined ? a.order : index,
@@ -322,20 +369,27 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
   }, [eventId]);
 
   /* ---------------------------
-     Submit handlers (simulate save with timeouts)
+     Submit handlers (persist to admin events API)
      --------------------------- */
   const onSubmitStep1 = async (data: Step1Data) => {
     try {
+      if (!eventId) {
+        toast.error('Missing event id');
+        return;
+      }
       setIsSubmitting(true);
-      // Always send ONLINE venue type
       const dataWithVenueType = {
         ...data,
-        venueType: 'ONLINE' as const,
+        venueType: data.venueType || ('ONLINE' as const),
       };
-      await new Promise((res) => setTimeout(res, 800)); // simulate API
-      setCompletedSteps((prev) => Array.from(new Set([...prev, 1])));
-      toast.success('Basic details saved successfully!');
-      goToStep(2);
+      const result = await eventsApi.updateEventStep1(eventId, dataWithVenueType);
+      if (result?.success || result?.id || result?.updatedAt) {
+        setCompletedSteps((prev) => Array.from(new Set([...prev, 1])));
+        toast.success('Basic details saved successfully!');
+        goToStep(2);
+      } else {
+        throw new Error(result?.message || 'Failed to save basic details');
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save basic details');
     } finally {
@@ -350,15 +404,18 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         return;
       }
       setIsSubmitting(true);
-      // Always send empty registration fields
       const dataWithEmptyFields = {
         ...data,
         registrationFields: [],
       };
-      await new Promise((res) => setTimeout(res, 800));
-      setCompletedSteps((prev) => Array.from(new Set([...prev, 2])));
-      toast.success('Configuration saved successfully!');
-      goToStep(3);
+      const result = await eventsApi.updateEventStep2(eventId, dataWithEmptyFields);
+      if (result?.success || result?.id || result?.updatedAt) {
+        setCompletedSteps((prev) => Array.from(new Set([...prev, 2])));
+        toast.success('Configuration saved successfully!');
+        goToStep(3);
+      } else {
+        throw new Error(result?.message || 'Failed to save configuration');
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save configuration');
     } finally {
@@ -373,28 +430,42 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         return;
       }
       setIsSubmitting(true);
-      // Ensure all speakers have the order field set correctly
-      const speakersWithOrder = data.speakers.map((speaker, index) => ({
-        ...speaker,
-        order: speaker.order !== undefined ? speaker.order : index,
-      }));
-      
-      // Ensure all agenda items have the order field set correctly
+      const speakersWithOrder = data.speakers.map((speaker, index) => {
+        const order = speaker.order !== undefined ? speaker.order : index;
+        const imageUrl = (speaker.profileImage ?? '').trim();
+        const companyTrim = (speaker.company ?? '').trim();
+        const bioTrim = (speaker.bio ?? '').trim();
+        const socialLinks = normalizeSpeakerSocialLinks(speaker.socialLinks);
+        return {
+          name: speaker.name,
+          title: speaker.title,
+          order,
+          ...(companyTrim ? { company: companyTrim } : {}),
+          ...(bioTrim ? { bio: bioTrim } : {}),
+          ...(socialLinks ? { socialLinks } : {}),
+          ...(imageUrl ? { profileImage: imageUrl, photoUrl: imageUrl } : {}),
+        };
+      });
+
       const agendaWithOrder = data.agenda.map((agendaItem, index) => ({
         ...agendaItem,
         order: agendaItem.order !== undefined ? agendaItem.order : index,
       }));
-      
+
       const dataWithOrder = {
         ...data,
         speakers: speakersWithOrder,
         agenda: agendaWithOrder,
       };
-      
-      await new Promise((res) => setTimeout(res, 800));
-      setCompletedSteps((prev) => Array.from(new Set([...prev, 3])));
-      toast.success('Speakers and agenda saved successfully!');
-      goToStep(4);
+
+      const result = await eventsApi.updateEventStep3(eventId, dataWithOrder);
+      if (result?.success || result?.id || result?.updatedAt) {
+        setCompletedSteps((prev) => Array.from(new Set([...prev, 3])));
+        toast.success('Speakers and agenda saved successfully!');
+        goToStep(4);
+      } else {
+        throw new Error(result?.message || 'Failed to save speakers and agenda');
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save speakers and agenda');
     } finally {
@@ -446,17 +517,19 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
     }
   }
 
-  // Save all changes from review step (simulate) — VALIDATION ADDED
+  // Save all changes from review step — runs step1 → step3 API updates in order
   const onSaveAll = async () => {
     try {
+      if (!eventId) {
+        toast.error('Missing event id');
+        return;
+      }
       setIsSubmitting(true);
 
-      // 1) Trigger validation on each form (returns boolean)
       const validStep1 = await step1Form.trigger();
       const validStep2 = await step2Form.trigger();
       const validStep3 = await step3Form.trigger();
 
-      // If any step invalid, navigate user to the first invalid step and show toast
       if (!validStep1 || !validStep2 || !validStep3) {
         if (!validStep1) {
           const msgs = formatErrorsForStep(1);
@@ -474,17 +547,54 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         return;
       }
 
-      // 2) All valid — collect data and simulate save
       const s1 = step1Form.getValues();
       const s2 = step2Form.getValues();
       const s3 = step3Form.getValues();
-      const payload = { ...s1, ...s2, ...s3 };
 
-      // simulate API call
-      await new Promise((res) => setTimeout(res, 900));
+      const r1 = await eventsApi.updateEventStep1(eventId, {
+        ...s1,
+        venueType: s1.venueType || ('ONLINE' as const),
+      });
+      if (!(r1?.success || r1?.id || r1?.updatedAt)) {
+        throw new Error(r1?.message || 'Failed to save basic details');
+      }
+
+      const r2 = await eventsApi.updateEventStep2(eventId, { ...s2, registrationFields: [] });
+      if (!(r2?.success || r2?.id || r2?.updatedAt)) {
+        throw new Error(r2?.message || 'Failed to save configuration');
+      }
+
+      const speakersWithOrder = s3.speakers.map((speaker, index) => {
+        const order = speaker.order !== undefined ? speaker.order : index;
+        const imageUrl = (speaker.profileImage ?? '').trim();
+        const companyTrim = (speaker.company ?? '').trim();
+        const bioTrim = (speaker.bio ?? '').trim();
+        const socialLinks = normalizeSpeakerSocialLinks(speaker.socialLinks);
+        return {
+          name: speaker.name,
+          title: speaker.title,
+          order,
+          ...(companyTrim ? { company: companyTrim } : {}),
+          ...(bioTrim ? { bio: bioTrim } : {}),
+          ...(socialLinks ? { socialLinks } : {}),
+          ...(imageUrl ? { profileImage: imageUrl, photoUrl: imageUrl } : {}),
+        };
+      });
+      const agendaWithOrder = s3.agenda.map((agendaItem, index) => ({
+        ...agendaItem,
+        order: agendaItem.order !== undefined ? agendaItem.order : index,
+      }));
+      const r3 = await eventsApi.updateEventStep3(eventId, {
+        ...s3,
+        speakers: speakersWithOrder,
+        agenda: agendaWithOrder,
+      });
+      if (!(r3?.success || r3?.id || r3?.updatedAt)) {
+        throw new Error(r3?.message || 'Failed to save speakers and agenda');
+      }
+
       setCompletedSteps((prev) => Array.from(new Set([...prev, 4])));
       toast.success('All changes saved successfully!');
-      console.log('Saved payload:', payload);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save changes');
     } finally {
@@ -493,17 +603,23 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
   };
 
   const onPublishEvent = async () => {
-    // kept for backward compatibility if needed
     if (!eventId) {
       toast.error('Cannot publish event');
       return;
     }
     try {
       setIsSubmitting(true);
-      await new Promise((res) => setTimeout(res, 800));
-      setCompletedSteps((prev) => Array.from(new Set([...prev, 4])));
-      toast.success('Event published successfully!');
-      router.push('/events');
+      const finalizeResult = await eventsApi.finalizeEvent(eventId, {
+        status: 'PUBLISHED',
+        sendNotification: true,
+      });
+      if (finalizeResult?.success || finalizeResult?.id || finalizeResult?.updatedAt) {
+        setCompletedSteps((prev) => Array.from(new Set([...prev, 4])));
+        toast.success('Event published successfully!');
+        router.push('/events');
+      } else {
+        throw new Error(finalizeResult?.message || 'Failed to publish event');
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to publish event');
     } finally {
@@ -701,6 +817,23 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
       </div>
 
       <div className="space-y-6">
+        <div className="border-b border-gray-200 pb-6">
+          <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+            Category
+          </label>
+          <select
+            id="category"
+            {...step2Form.register('category')}
+            className="mt-1 block w-full rounded-md border border-gray-400 text-black shadow-sm focus:border-gray-500 focus:ring-gray-500 sm:text-sm h-11 px-3"
+          >
+            <option value="FEATURED">Featured</option>
+            <option value="OTHERS">Others</option>
+          </select>
+          {step2Form.formState.errors.category && (
+            <p className="mt-1 text-sm text-red-600">{step2Form.formState.errors.category.message}</p>
+          )}
+        </div>
+
         <div className="border-b border-gray-200 pb-6">
           <h3 className="text-lg font-medium text-gray-900">Featured Image</h3>
           <div className="mt-4">
@@ -1105,7 +1238,8 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
             <div><strong>Description:</strong> {s1.description || '—'}</div>
             <div><strong>Start:</strong> {s1.startDateTime || '—'}</div>
             <div><strong>End:</strong> {s1.endDateTime || '—'}</div>
-            <div><strong>Venue Type:</strong> {s1.venueType}</div>
+            <div><strong>Meet link:</strong> {s1.meetLink || '—'}</div>
+            <div><strong>Venue Type:</strong> {s1.venueType || '—'}</div>
             <div><strong>Location:</strong> {s1.location || '—'}</div>
             <div><strong>Address:</strong> {s1.venueAddress || '—'}</div>
           </div>
@@ -1114,6 +1248,7 @@ export default function EditEventPage({ params }: { params: Promise<{ eventId: s
         <section>
           <h3 className="text-lg font-semibold border-b text-black border-gray-300 pb-2">Configuration</h3>
           <div className="mt-2 text-sm text-gray-700 space-y-1">
+            <div><strong>Category:</strong> {s2.category || '—'}</div>
             <div><strong>Featured Image:</strong> {s2.featuredImage || '—'}</div>
             <div><strong>Max Attendees:</strong> {s2.maxAttendees}</div>
             <div><strong>Price:</strong> {s2.isFree ? 'Free' : s2.price ?? '—'}</div>

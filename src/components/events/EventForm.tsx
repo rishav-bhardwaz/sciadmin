@@ -114,6 +114,23 @@ const step3Schema = z.object({
   agenda: z.array(agendaItemSchema),
 });
 
+/** Omit empty strings so API/DB and mobile only store & show real social URLs */
+function normalizeSpeakerSocialLinks(links?: {
+  linkedin?: string;
+  twitter?: string;
+  website?: string;
+}): Partial<{ linkedin: string; twitter: string; website: string }> | undefined {
+  if (!links) return undefined;
+  const linkedin = (links.linkedin ?? '').trim();
+  const twitter = (links.twitter ?? '').trim();
+  const website = (links.website ?? '').trim();
+  const out: Partial<{ linkedin: string; twitter: string; website: string }> = {};
+  if (linkedin) out.linkedin = linkedin;
+  if (twitter) out.twitter = twitter;
+  if (website) out.website = website;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 type Step1Data = z.infer<typeof step1Schema>;
 type Step2Data = z.infer<typeof step2Schema>;
 type Step3Data = z.infer<typeof step3Schema>;
@@ -269,11 +286,23 @@ export default function EventForm() {
 
     try {
       setIsSubmitting(true);
-      // Ensure all speakers have the order field set correctly
-      const speakersWithOrder = data.speakers.map((speaker, index) => ({
-        ...speaker,
-        order: speaker.order !== undefined ? speaker.order : index,
-      }));
+      // Map form `profileImage` to API/EventSpeaker columns profileImage and photoUrl (legacy)
+      const speakersWithOrder = data.speakers.map((speaker, index) => {
+        const order = speaker.order !== undefined ? speaker.order : index;
+        const imageUrl = (speaker.profileImage ?? '').trim();
+        const companyTrim = (speaker.company ?? '').trim();
+        const bioTrim = (speaker.bio ?? '').trim();
+        const socialLinks = normalizeSpeakerSocialLinks(speaker.socialLinks);
+        return {
+          name: speaker.name,
+          title: speaker.title,
+          order,
+          ...(companyTrim ? { company: companyTrim } : {}),
+          ...(bioTrim ? { bio: bioTrim } : {}),
+          ...(socialLinks ? { socialLinks } : {}),
+          ...(imageUrl ? { profileImage: imageUrl, photoUrl: imageUrl } : {}),
+        };
+      });
       
       // Ensure all agenda items have the order field set correctly
       const agendaWithOrder = data.agenda.map((agendaItem, index) => ({
